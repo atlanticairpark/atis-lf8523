@@ -20,7 +20,7 @@ def obtenir_metar(icao):
         if response.status_code != 200: return None
         metar = response.text.split('\n')[1]
         
-        # Vent (Direction et Vitesse)
+        # Vent
         wind_match = re.search(r' (\d{3})(\d{2})KT', metar)
         w_dir = int(wind_match.group(1)) if wind_match else None
         w_spd = int(wind_match.group(2)) if wind_match else None
@@ -31,11 +31,8 @@ def obtenir_metar(icao):
         
         # Temp/Dew
         temp_match = re.search(r' (M?\d{2})/(M?\d{2}) ', metar)
-        if temp_match:
-            t = int(temp_match.group(1).replace('M', '-'))
-            d = int(temp_match.group(2).replace('M', '-'))
-        else:
-            t, d = None, None
+        t = int(temp_match.group(1).replace('M', '-')) if temp_match else None
+        d = int(temp_match.group(2).replace('M', '-')) if temp_match else None
             
         return {"qnh": qnh, "temp": t, "dew": d, "wind_dir": w_dir, "wind_speed": w_spd}
     except:
@@ -58,14 +55,20 @@ def executer_veille():
     # 2. INFOS TERRAIN
     rapport += f"🚧 *Infos Terrain :*\n{INFOS_LOCALES}\n\n"
     
-    # 3. NOTAM R147 (Scan via source communautaire fiable)
+    # 3. NOTAM R147 (Méthode de scan direct par mot-clé)
+    # On utilise un service de consultation public simple
     r147_status = "✅ Non signalée"
     try:
-        # On interroge un flux qui centralise les NOTAM français
-        url_secours = "https://notamapi.com/api/notams/LFRR"
-        res = requests.get(url_secours, timeout=10)
-        if "R147" in res.text.upper():
-            r147_status = "⚠️ ACTIVÉE (Vérifiez SIA/Sofia)"
+        # On va chercher la page des NOTAM de la FIR de Paris (LFRR)
+        url_notam = "https://www.notams.faa.gov/common/icao/LFRR.html"
+        headers = {'User-Agent': 'Mozilla/5.0'} # On fait croire qu'on est un navigateur web
+        res = requests.get(url_notam, headers=headers, timeout=15)
+        
+        if res.status_code == 200:
+            if "R147" in res.text.upper():
+                r147_status = "⚠️ ACTIVÉE (Voir SIA/Sofia)"
+        else:
+            r147_status = "❓ Serveur NOTAM occupé"
     except:
         r147_status = "❓ Vérification manuelle (SIA)"
 
