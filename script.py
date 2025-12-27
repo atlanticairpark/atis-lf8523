@@ -1,46 +1,68 @@
 import requests
 import os
 
+# Secrets GitHub
 TOKEN = os.getenv("TELEGRAM_TOKEN")
 CHAT_ID = os.getenv("TELEGRAM_CHAT_ID")
+
+# --- CONFIGURATION MANUELLE DES INFOS TERRAIN ---
+# Modifie ces textes entre les guillemets selon les besoins du moment
+INFOS_LOCALES = "Piste en herbe fermée (terrain gras). Péril aviaire signalé en bout de piste 24."
 
 def envoyer_telegram(message):
     url = f"https://api.telegram.org/bot{TOKEN}/sendMessage"
     payload = {"chat_id": CHAT_ID, "text": message, "parse_mode": "Markdown"}
     requests.post(url, data=payload)
 
-def recuperer_meteo(icao):
-    # Utilisation d'une API météo aéronautique gratuite (avwx par exemple)
-    url = f"https://avwx.rest/api/metar/{icao}?format=json"
+def obtenir_metar(icao):
+    # Source gratuite pour les METAR
+    url = f"https://tgftp.nws.noaa.gov/data/observations/metar/stations/{icao}.TXT"
     try:
         response = requests.get(url)
-        return response.json()
+        line = response.text.split('\n')[1]
+        # Extraction simplifiée du QNH (ex: Q1018)
+        qnh = int(line.split('Q')[1][:4])
+        # Extraction Température/Point rosée (ex: 12/08)
+        temp_part = line.split(' ')[-3]
+        temp = int(temp_part.split('/')[0].replace('M', '-'))
+        dew = int(temp_part.split('/')[1].replace('M', '-'))
+        return {"qnh": qnh, "temp": temp, "dew": dew}
     except:
         return None
 
-def calculer_moyenne_atlantique():
-    m1 = recuperer_meteo("LFBH") # La Rochelle
-    m2 = recuperer_meteo("LFRI") # La Roche-sur-Yon
+def executer_veille():
+    rapport = "📡 *BULLETIN AUTOMATIQUE LF038*\n━━━━━━━━━━━━━━━━━━\n\n"
     
-    if m1 and m2:
-        # Calcul des moyennes
-        qnh = (m1['altimeter']['value'] + m2['altimeter']['value']) / 2
-        temp = (m1['temperature']['value'] + m2['temperature']['value']) / 2
-        dew = (m1['dewpoint']['value'] + m2['dewpoint']['value']) / 2
-        
-        # Pour le vent, on prend souvent la valeur la plus prudente ou la moyenne
-        v_vitesse = (m1['wind_speed']['value'] + m2['wind_speed']['value']) / 2
-        
-        msg = (
-            f"🌡 *ESTIMATION MÉTÉO LF038*\n"
-            f"━━━━━━━━━━━━━━━━━━\n"
-            f"📍 *Moyenne LFBH / LFRI*\n"
-            f"🔹 *QNH :* {qnh:.0f} hPa\n"
-            f"🔹 *Vent :* {v_vitesse:.0s} kt\n"
-            f"🔹 *OAT :* {temp:.1f}°C\n"
-            f"🔹 *Point de rosée :* {dew:.1f}°C\n"
-        )
-        return msg
-    return "Erreur récupération météo."
+    # 1. MÉTÉO MOYENNÉE
+    m_lfbh = obtenir_metar("LFBH")
+    m_lfri = obtenir_metar("LFRI")
+    
+    if m_lfbh and m_lfri:
+        qnh_moy = (m_lfbh['qnh'] + m_lfri['qnh']) / 2
+        temp_moy = (m_lfbh['temp'] + m_lfri['temp']) / 2
+        dew_moy = (m_lfbh['dew'] + m_lfri['dew']) / 2
+        rapport += f"🌤 *Météo (Moyenne LFBH/LFRI) :*\n• QNH : {qnh_moy:.0f} hPa\n• Temp : {temp_moy:.1f}°C\n• Rosée : {dew_moy:.1f}°C\n\n"
+    
+    # 2. INFOS TERRAIN (Tes messages)
+    rapport += f"⚠️ *Infos Atlantic Air Park :*\n{INFOS_LOCALES}\n\n"
+    
+    # 3. SURVEILLANCE R147
+    url_notam = "https://api.aviation-edge.com/api/public/notam?region=LFRR"
+    try:
+        res = requests.get(url_notam)
+        notams = res.json()
+        r147_detectee = False
+        for n in notams:
+            if "R147" in str(n).upper():
+                r147_detectee = True
+                rapport += f"🚫 *ZONE R147 ACTIVE !*\nConsultez le détail sur le SIA.\n"
+                break
+        if not r147_detectee:
+            rapport += "✅ Zone R147 non signalée active.\n"
+    except:
+        rapport += "❌ Erreur scan NOTAM.\n"
 
-# ... (garder ta fonction verifier_r147 ici) ...
+    envoyer_telegram(rapport)
+
+if __name__ == "__main__":
+    executer_veille()
