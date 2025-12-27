@@ -14,10 +14,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4 # Mis à jour de v3 à v4
 
       - name: Set up Python
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@v5 # Mis à jour de v4 à v5
         with:
           python-version: '3.9'
 
@@ -31,9 +31,9 @@ jobs:
         run: python script.py
 
       - name: Upload Artifact
-        uses: actions/upload-pages-artifact@v2
+        uses: actions/upload-pages-artifact@v3 # Mis à jour de v2 à v3 (compatible v4)
         with:
           path: '.'
 
       - name: Deploy to GitHub Pages
-        uses: actions/deploy-pages@v2
+        uses: actions/deploy-pages@v4 # Mis à jour de v2 à v4
