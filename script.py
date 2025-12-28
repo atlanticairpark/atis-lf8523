@@ -69,7 +69,7 @@ h1 {{ color: #004a99; margin-bottom: 5px; }}
 .data {{ font-size: 1.4em; font-weight: bold; margin: 15px 0; border-bottom: 1px solid #eee; padding-bottom: 5px; }}
 audio {{ width: 100%; margin-top: 25px; border-radius: 50px; }}
 .notam {{ color: #d9534f; font-weight: bold; margin-top: 15px; }}
-</style></head><body><div class="card"><h1>LF8523 ATIS</h1><p>Atlantic Air Park</p>
+</style></head><body><div class="card"><h1>ATIS LF8523</h1><p>Atlantic Air Park</p>
 <div class="obs">⌚ {m1['heure_metar']} UTC</div>
 <div class="data">🌬 {wd:03.0f}° / {ws:.0f} kt</div>
 <div class="data">🌡 {t_moy:.0f}°C (DP:{d_moy:.0f}°C)</div>
