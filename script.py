@@ -42,14 +42,14 @@ def executer_veille():
     wd, ws = (m1['w_dir'] + m2['w_dir']) / 2, (m1['w_spd'] + m2['w_spd']) / 2
 
     # --- AUDIO FRANÇAIS ---
-    vocal_fr = (f"Atlantic Air Park. Observation de {m1['heure_vocal']} UTC. "
-                f"Vent {wd:03.0f} degrés, {ws:.0f} nœuds. Température {t_moy:.0f} degrés. "
-                f"Point de rosée {d_moy:.0f} degrés. Q N H {q_moy:.0f} hectopascals. {INFOS_FR}")
+    vocal_fr = (f"Atlantic Air Park. Observation de {m1['heure_vocal']} UTC "
+                f"Vent {wd:03.0f} degrés {ws:.0f} nœuds. Température {t_moy:.0f} degrés. "
+                f"Point de rosée {d_moy:.0f} degrés. QNH {q_moy:.0f} hectopascals. {INFOS_FR}")
     
-    # --- AUDIO ANGLAIS (Accent UK) ---
+    # --- AUDIO ANGLAIS (Accent US) ---
     vocal_en = (f"Atlantic Air Park. Observation at {m1['heure_metar'].replace(':', ' ')} UTC. "
-                f"Wind {wd:03.0f} degrees, {ws:.0f} knots. Temperature {t_moy:.0f} degrees. "
-                f"Dew point {d_moy:.0f} degrees. Q, N, H, {q_moy:.0f}. {INFOS_EN}")
+                f"Wind {wd:03.0f} degrees {ws:.0f} knots. Temperature {t_moy:.0f} degrees "
+                f"Dew point {d_moy:.0f} degrees. Q N H, {q_moy:.0f}. {INFOS_EN}")
 
     # Fusion des voix
     tts_fr = gTTS(text=vocal_fr, lang='fr')
