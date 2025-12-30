@@ -2,12 +2,12 @@ name: Update ATIS WebPage
 
 on:
   schedule:
-    - cron: '10,40 * * * *'  # Se déclenche à chaque heure :10 et :40
-  workflow_dispatch:       # Permet de lancer le script manuellement pour tester
+    - cron: '10,40 * * * *'
+  workflow_dispatch:
 
 permissions:
-  contents: write          # Autorise l'écriture de index.html et atis.mp3
-  pages: write             # Autorise le déploiement sur GitHub Pages
+  contents: write
+  pages: write
   id-token: write
 
 jobs:
@@ -17,7 +17,7 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0   # Nécessaire pour pouvoir faire un push ensuite
+          fetch-depth: 0
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -40,7 +40,6 @@ jobs:
           git config --local user.email "action@github.com"
           git config --local user.name "GitHub Action"
           git add index.html atis.mp3
-          # Le "|| exit 0" évite de faire planter le workflow s'il n'y a aucun changement
           git commit -m "Mise à jour ATIS" || exit 0
           git push https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git HEAD:main
 
