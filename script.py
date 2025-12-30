@@ -87,6 +87,13 @@ async def executer_veille():
     notams = scanner_notams()
     if not m: return
 
+    # RÉCUPÉRATION DES REMARQUES DEPUIS GITHUB
+    remarques_raw = os.getenv("ATIS_REMARQUES", "Piste en herbe 08/26 fermée cause travaux | Prudence / Péril aviaire")
+    liste_remarques = [r.strip() for r in remarques_raw.split("|")]
+    
+    html_remarques = "".join([f'<div class="alert-line">⚠️ {r}</div>' for r in liste_remarques])
+    audio_remarques = ". ".join(liste_remarques) + "."
+
     # AUDIO
     notam_audio = f"Zone R 147 : {notams['R147']}."
     if "active" in notams['R45A']:
@@ -95,12 +102,12 @@ async def executer_veille():
     txt_fr = (f"Atlantic Air Park, observation de {m['heure_metar'].replace(':',' heures ')} UTC. "
               f"{m['w_audio_fr']}. Température {m['t_audio_fr']} degrés. Point de rosée {m['d_audio_fr']} degrés. "
               f"Q N H {m['q_audio_fr']} hectopascals. "
-              f"Piste en herbe zéro huit vingt-six fermée cause travaux. Prudence. Péril aviaire. "
+              f"{audio_remarques} "
               f"{notam_audio}")
 
     txt_en = (f"Atlantic Air Park observation at {m['heure_metar'].replace(':',' ')} UTC. "
               f"{m['w_audio_en']}. Temperature {m['t_audio_en']} degrees. Dew point {m['d_audio_en']} degrees. "
-              f"Q N H {m['q_audio_en']} hectopascals. Grass runway zero eight twenty-six closed due to works. Caution. Bird hazard. "
+              f"Q N H {m['q_audio_en']} hectopascals. Caution. Bird hazard. "
               f"Check NOTAM for military areas.")
 
     await generer_audio(txt_fr, txt_en)
@@ -131,8 +138,7 @@ async def executer_veille():
         <div class="data-item"><div class="label">QNH</div><div class="value">💎 {m['qnh']} hPa</div></div>
     </div>
     <div class="alert-section">
-        <div class="alert-line">⚠️ Piste en herbe 08/26 fermée cause travaux</div>
-        <div class="alert-line">⚠️ Prudence / Péril aviaire</div>
+        {html_remarques}
         <div class="alert-line">⚠️ RTBA R147 : {notams['R147']}</div>
         <div class="alert-line" style="color:#4dabff; font-size: 0.8em;">🔹 TEST R45A : {notams['R45A']}</div>
     </div>
