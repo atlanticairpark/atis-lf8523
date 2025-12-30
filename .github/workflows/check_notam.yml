@@ -30,10 +30,10 @@ jobs:
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
         run: python script.py
 
-      - name: Upload Artifact
-        uses: actions/upload-pages-artifact@v3 # Mis à jour de v2 à v3 (compatible v4)
-        with:
-          path: '.'
-
-      - name: Deploy to GitHub Pages
-        uses: actions/deploy-pages@v4 # Mis à jour de v2 à v4
+      - name: Commit and Push changes
+        run: |
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action"
+          git add index.html atis.mp3
+          git commit -m "Mise à jour automatique de l'ATIS" || exit 0
+          git push
