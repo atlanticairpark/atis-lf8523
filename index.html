@@ -11,13 +11,15 @@
         .alert-section { text-align: left; background: rgba(255, 204, 0, 0.1); border-left: 4px solid #ffcc00; padding: 15px; margin-bottom: 25px; }
         .alert-line { color: #ffcc00; font-weight: bold; font-size: 0.9em; margin-bottom: 8px; }
         audio { width: 100%; filter: invert(90%); margin-top: 10px; }
-        .disclaimer { font-size: 0.65em; color: #555; margin-top: 30px; line-height: 1.4; font-style: italic; border-top: 1px solid #222; padding-top: 15px; }
+        .btn-refresh { background: #333; color: #ccc; border: 1px solid #444; padding: 8px 15px; border-radius: 5px; cursor: pointer; margin-top: 20px; font-size: 0.8em; transition: 0.3s; }
+        .btn-refresh:hover { background: #444; color: #fff; }
+        .disclaimer { font-size: 0.7em; color: #ccc; margin-top: 30px; line-height: 1.4; font-style: italic; border-top: 1px solid #333; padding-top: 15px; text-align: justify; }
     </style></head><body><div class="card">
     <h1>ATIS LF8523</h1><div class="subtitle">Atlantic Air Park</div>
     <div class="data-grid">
-        <div class="data-item"><div class="label">Heure (Moyenne)</div><div class="value">⌚ 12:30Z</div></div>
-        <div class="data-item"><div class="label">Vent</div><div class="value">🌬 065 / 19kt</div></div>
-        <div class="data-item"><div class="label">Temp / Rosée</div><div class="value">🌡 5° / 0°</div></div>
+        <div class="data-item"><div class="label">Heure (UTC)</div><div class="value">⌚ 13:30Z</div></div>
+        <div class="data-item"><div class="label">Vent</div><div class="value">🌬 060 / 19kt</div></div>
+        <div class="data-item"><div class="label">Temp / Rosée</div><div class="value">🌡 6° / 0°</div></div>
         <div class="data-item"><div class="label">QNH</div><div class="value">💎 1024 hPa</div></div>
     </div>
     <div class="alert-section">
@@ -27,8 +29,9 @@
     </div>
     <div class="label" style="margin-bottom:10px;">Écouter l'audio (Bilingue)</div>
     <audio controls autoplay><source src="atis.mp3" type="audio/mpeg"></audio>
+    <button class="btn-refresh" onclick="window.location.reload()">🔄 Actualiser la page</button>
     <div class="disclaimer">
-        Valeurs issues des METAR LFBH (La Rochelle) et LFRI (La Roche-sur-Yon) moyennées.<br>
+        Valeurs issues des METAR LFBH (La Rochelle) et LFRI (La Roche-sur-Yon) moyennées. Les rafales correspondent à la valeur maximale observée. 
         Ce service est une aide à l'information. Atlantic Air Park ne saurait être tenu responsable en cas d'erreur ou d'omission. Seule la documentation officielle (SIA/Météo-France) fait foi.
     </div>
     </div></body></html>
