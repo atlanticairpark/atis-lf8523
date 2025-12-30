@@ -62,12 +62,10 @@ def obtenir_donnees_moyennes():
     }
 
 def scanner_notams():
-    # Initialisation des deux zones
     status = {"R147": "pas d'information", "R45A": "pas d'information"}
     try:
         res = requests.get("https://api.allorigins.win/get?url=" + requests.utils.quote("https://www.notams.faa.gov/common/icao/LFRR.html"), timeout=15)
         texte = res.text.upper()
-        
         for zone in ["R147", "R45A"]:
             match = re.search(f"{zone}.*?(\\d{{4}}.*?TO.*?\\d{{4}})", texte)
             if match:
@@ -89,7 +87,7 @@ async def executer_veille():
     notams = scanner_notams()
     if not m: return
 
-    # AUDIO (On mentionne la R147 en priorité, et la R45A si elle est active pour le test)
+    # AUDIO
     notam_audio = f"Zone R 147 : {notams['R147']}."
     if "active" in notams['R45A']:
         notam_audio += f" Notez également zone R 45 alpha {notams['R45A']}."
@@ -134,8 +132,9 @@ async def executer_veille():
     </div>
     <div class="alert-section">
         <div class="alert-line">⚠️ Piste en herbe 08/26 fermée cause travaux</div>
+        <div class="alert-line">⚠️ Prudence / Péril aviaire</div>
         <div class="alert-line">⚠️ RTBA R147 : {notams['R147']}</div>
-        <div class="alert-line" style="color:#4dabff;">🔹 TEST R45A : {notams['R45A']}</div>
+        <div class="alert-line" style="color:#4dabff; font-size: 0.8em;">🔹 TEST R45A : {notams['R45A']}</div>
     </div>
     <div class="label" style="margin-bottom:10px;">Écouter l'audio (Bilingue)</div>
     <audio controls><source src="atis.mp3?v={ts}" type="audio/mpeg"></audio>
