@@ -8,13 +8,12 @@ import edge_tts
 STATIONS = ["LFBH", "LFRI"]
 
 def formater_chiffre_fr(n):
-    """Gère la diction spécifique : 'unité' pour 1 et suppression du zéro initial."""
     n_str = str(n).replace('-', '')
     if n_str == "1": return "unité"
     return n_str.lstrip('0') if len(n_str) > 1 and n_str.startswith('0') else n_str
 
 def obtenir_donnees_moyennes():
-    temps, rosees, qnhs, vents_dir, vents_spd = [], [], [], [], []
+    temps, rosees, qnhs, vents_dir, vents_spd, rafales = [], [], [], [], [], []
     h_tele = "--:--"
 
     for icao in STATIONS:
@@ -26,43 +25,46 @@ def obtenir_donnees_moyennes():
                 if len(lines) < 2: continue
                 metar = lines[1]
                 
-                # Heure (on garde la dernière lue)
                 time_match = re.search(r' (\d{2})(\d{2})(\d{2})Z', metar)
-                if time_match:
-                    h_tele = f"{time_match.group(2)}:{time_match.group(3)}"
+                if time_match: h_tele = f"{time_match.group(2)}:{time_match.group(3)}"
 
-                # Temp/Rosée
                 tr_match = re.search(r' (M?\d{2})/(M?\d{2}) ', metar)
                 if tr_match:
                     temps.append(int(tr_match.group(1).replace('M', '-')))
                     rosees.append(int(tr_match.group(2).replace('M', '-')))
 
-                # QNH
                 q_match = re.search(r'Q(\d{4})', metar)
                 if q_match: qnhs.append(int(q_match.group(1)))
 
-                # Vent
-                w_match = re.search(r' (\d{3})(\d{2})KT', metar)
+                w_match = re.search(r' (\d{3})(\d{2})(G\d{2})?KT', metar)
                 if w_match:
                     vents_dir.append(int(w_match.group(1)))
                     vents_spd.append(int(w_match.group(2)))
+                    if w_match.group(3):
+                        rafales.append(int(w_match.group(3).replace('G', '')))
         except: continue
 
     if not qnhs: return None
 
-    # Calcul des moyennes
-    m_t = round(sum(temps) / len(temps))
-    m_r = round(sum(rosees) / len(rosees))
-    m_q = round(sum(qnhs) / len(qnhs))
-    m_wd = round(sum(vents_dir) / len(vents_dir))
-    m_ws = round(sum(vents_spd) / len(vents_spd))
-
-    # Préparation Audio QNH
+    m_t, m_r, m_q = round(sum(temps)/len(temps)), round(sum(rosees)/len(rosees)), round(sum(qnhs)/len(qnhs))
+    m_wd, m_ws = round(sum(vents_dir)/len(vents_dir)), round(sum(vents_spd)/len(vents_spd))
+    
+    # Gestion des rafales : on prend la plus forte détectée
+    max_g = max(rafales) if rafales else None
+    
     q_str = str(m_q)
     q_audio_fr = " ".join([formater_chiffre_fr(c) for c in list(q_str)])
-    
-    # Préparation Audio Vent EN
     wd_en = " ".join(list(str(m_wd).zfill(3))).replace('0','zero').replace('1','one')
+
+    # Construction texte vent avec rafales
+    v_fr = f"vent {m_wd} degrés, {m_ws} nœuds"
+    v_en = f"wind {wd_en} degrees, {m_ws} knots"
+    v_visu = f"{str(m_wd).zfill(3)} / {m_ws}"
+    
+    if max_g and max_g > m_ws:
+        v_fr += f", avec rafales à {max_g} nœuds"
+        v_en += f", gusting {max_g} knots"
+        v_visu += f"G{max_g}"
 
     return {
         "heure_metar": h_tele, "qnh": q_str, "q_audio_fr": q_audio_fr, "q_audio_en": " ".join(list(q_str)),
@@ -71,9 +73,7 @@ def obtenir_donnees_moyennes():
         "d_audio_fr": (("moins " if m_r < 0 else "") + formater_chiffre_fr(abs(m_r))),
         "t_audio_en": (("minus " if m_t < 0 else "") + str(abs(m_t))),
         "d_audio_en": (("minus " if m_r < 0 else "") + str(abs(m_r))),
-        "w_dir_visu": str(m_wd).zfill(3), "w_spd_visu": str(m_ws),
-        "w_audio_fr": f"vent {m_wd} degrés, {m_ws} nœuds",
-        "w_audio_en": f"wind {wd_en} degrees, {m_ws} knots"
+        "w_dir_visu": v_visu, "w_audio_fr": v_fr, "w_audio_en": v_en
     }
 
 def scanner_notams():
@@ -83,10 +83,7 @@ def scanner_notams():
         texte = res.text.upper()
         if "R147" in texte:
             horaires = re.findall(r"R147.*?(\d{4}.*?TO.*?\d{4})", texte)
-            if horaires:
-                resultats["R147"] = f"active de {horaires[0].replace('TO', 'à')}"
-            else:
-                resultats["R147"] = "active (voir NOTAM)"
+            if horaires: resultats["R147"] = f"active de {horaires[0].replace('TO', 'à')}"
     except: pass
     return resultats
 
@@ -104,14 +101,12 @@ async def executer_veille():
     notams = scanner_notams()
     if not m: return
 
-    # --- AUDIO FR ---
     txt_fr = (f"Atlantic Air Park, observation de {m['heure_metar'].replace(':',' heures ')} UTC. "
               f"{m['w_audio_fr']}. Température {m['t_audio_fr']} degrés. Point de rosée {m['d_audio_fr']} degrés. "
               f"Q N H {m['q_audio_fr']} hectopascals. "
               f"Piste en herbe zéro huit vingt-six fermée cause travaux. Prudence. Péril aviaire. "
               f"Zone R 147 : {notams['R147']}.")
 
-    # --- AUDIO EN ---
     txt_en = (f"Atlantic Air Park observation at {m['heure_metar'].replace(':',' ')} UTC. "
               f"{m['w_audio_en']}. Temperature {m['t_audio_en']} degrees. Dew point {m['d_audio_en']} degrees. "
               f"Q N H {m['q_audio_en']} hectopascals. Grass runway zero eight twenty-six closed due to works. Caution. Bird hazard. "
@@ -119,7 +114,6 @@ async def executer_veille():
 
     await generer_audio(txt_fr, txt_en)
 
-    # --- HTML VISUEL ---
     html_content = f"""<!DOCTYPE html><html lang="fr"><head><meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0"><title>ATIS LF8523</title>
     <style>
@@ -133,12 +127,14 @@ async def executer_veille():
         .alert-section {{ text-align: left; background: rgba(255, 204, 0, 0.1); border-left: 4px solid #ffcc00; padding: 15px; margin-bottom: 25px; }}
         .alert-line {{ color: #ffcc00; font-weight: bold; font-size: 0.9em; margin-bottom: 8px; }}
         audio {{ width: 100%; filter: invert(90%); margin-top: 10px; }}
-        .disclaimer {{ font-size: 0.65em; color: #555; margin-top: 30px; line-height: 1.4; font-style: italic; border-top: 1px solid #222; padding-top: 15px; }}
+        .btn-refresh {{ background: #333; color: #ccc; border: 1px solid #444; padding: 8px 15px; border-radius: 5px; cursor: pointer; margin-top: 20px; font-size: 0.8em; transition: 0.3s; }}
+        .btn-refresh:hover {{ background: #444; color: #fff; }}
+        .disclaimer {{ font-size: 0.7em; color: #ccc; margin-top: 30px; line-height: 1.4; font-style: italic; border-top: 1px solid #333; padding-top: 15px; text-align: justify; }}
     </style></head><body><div class="card">
     <h1>ATIS LF8523</h1><div class="subtitle">Atlantic Air Park</div>
     <div class="data-grid">
-        <div class="data-item"><div class="label">Heure (Moyenne)</div><div class="value">⌚ {m['heure_metar']}Z</div></div>
-        <div class="data-item"><div class="label">Vent</div><div class="value">🌬 {m['w_dir_visu']} / {m['w_spd_visu']}kt</div></div>
+        <div class="data-item"><div class="label">Heure (UTC)</div><div class="value">⌚ {m['heure_metar']}Z</div></div>
+        <div class="data-item"><div class="label">Vent</div><div class="value">🌬 {m['w_dir_visu']}kt</div></div>
         <div class="data-item"><div class="label">Temp / Rosée</div><div class="value">🌡 {m['temp_visu']}° / {m['dew_visu']}°</div></div>
         <div class="data-item"><div class="label">QNH</div><div class="value">💎 {m['qnh']} hPa</div></div>
     </div>
@@ -149,8 +145,9 @@ async def executer_veille():
     </div>
     <div class="label" style="margin-bottom:10px;">Écouter l'audio (Bilingue)</div>
     <audio controls autoplay><source src="atis.mp3" type="audio/mpeg"></audio>
+    <button class="btn-refresh" onclick="window.location.reload()">🔄 Actualiser la page</button>
     <div class="disclaimer">
-        Valeurs issues des METAR LFBH (La Rochelle) et LFRI (La Roche-sur-Yon) moyennées.<br>
+        Valeurs issues des METAR LFBH (La Rochelle) et LFRI (La Roche-sur-Yon) moyennées. Les rafales correspondent à la valeur maximale observée. 
         Ce service est une aide à l'information. Atlantic Air Park ne saurait être tenu responsable en cas d'erreur ou d'omission. Seule la documentation officielle (SIA/Météo-France) fait foi.
     </div>
     </div></body></html>"""
