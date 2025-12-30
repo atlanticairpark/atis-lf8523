@@ -3,11 +3,13 @@ import os
 import re
 import asyncio
 import edge_tts
+import time
 
 # Configuration
 STATIONS = ["LFBH", "LFRI"]
 
 def formater_chiffre_fr(n):
+    """Gère la diction spécifique : 'unité' pour 1 et suppression du zéro initial."""
     n_str = str(n).replace('-', '')
     if n_str == "1": return "unité"
     return n_str.lstrip('0') if len(n_str) > 1 and n_str.startswith('0') else n_str
@@ -25,17 +27,22 @@ def obtenir_donnees_moyennes():
                 if len(lines) < 2: continue
                 metar = lines[1]
                 
+                # Heure (UTC)
                 time_match = re.search(r' (\d{2})(\d{2})(\d{2})Z', metar)
-                if time_match: h_tele = f"{time_match.group(2)}:{time_match.group(3)}"
+                if time_match:
+                    h_tele = f"{time_match.group(2)}:{time_match.group(3)}"
 
+                # Temp/Rosée
                 tr_match = re.search(r' (M?\d{2})/(M?\d{2}) ', metar)
                 if tr_match:
                     temps.append(int(tr_match.group(1).replace('M', '-')))
                     rosees.append(int(tr_match.group(2).replace('M', '-')))
 
+                # QNH
                 q_match = re.search(r'Q(\d{4})', metar)
                 if q_match: qnhs.append(int(q_match.group(1)))
 
+                # Vent et Rafales
                 w_match = re.search(r' (\d{3})(\d{2})(G\d{2})?KT', metar)
                 if w_match:
                     vents_dir.append(int(w_match.group(1)))
@@ -46,17 +53,22 @@ def obtenir_donnees_moyennes():
 
     if not qnhs: return None
 
-    m_t, m_r, m_q = round(sum(temps)/len(temps)), round(sum(rosees)/len(rosees)), round(sum(qnhs)/len(qnhs))
-    m_wd, m_ws = round(sum(vents_dir)/len(vents_dir)), round(sum(vents_spd)/len(vents_spd))
+    # Moyennes
+    m_t = round(sum(temps) / len(temps))
+    m_r = round(sum(rosees) / len(rosees))
+    m_q = round(sum(qnhs) / len(qnhs))
+    m_wd = round(sum(vents_dir) / len(vents_dir))
+    m_ws = round(sum(vents_spd) / len(vents_spd))
     
-    # Gestion des rafales : on prend la plus forte détectée
+    # Rafale max si présente
     max_g = max(rafales) if rafales else None
-    
+
+    # Audio QNH
     q_str = str(m_q)
     q_audio_fr = " ".join([formater_chiffre_fr(c) for c in list(q_str)])
+    
+    # Audio Vent
     wd_en = " ".join(list(str(m_wd).zfill(3))).replace('0','zero').replace('1','one')
-
-    # Construction texte vent avec rafales
     v_fr = f"vent {m_wd} degrés, {m_ws} nœuds"
     v_en = f"wind {wd_en} degrees, {m_ws} knots"
     v_visu = f"{str(m_wd).zfill(3)} / {m_ws}"
@@ -83,7 +95,8 @@ def scanner_notams():
         texte = res.text.upper()
         if "R147" in texte:
             horaires = re.findall(r"R147.*?(\d{4}.*?TO.*?\d{4})", texte)
-            if horaires: resultats["R147"] = f"active de {horaires[0].replace('TO', 'à')}"
+            if horaires:
+                resultats["R147"] = f"active de {horaires[0].replace('TO', 'à')}"
     except: pass
     return resultats
 
@@ -101,6 +114,7 @@ async def executer_veille():
     notams = scanner_notams()
     if not m: return
 
+    # AUDIO
     txt_fr = (f"Atlantic Air Park, observation de {m['heure_metar'].replace(':',' heures ')} UTC. "
               f"{m['w_audio_fr']}. Température {m['t_audio_fr']} degrés. Point de rosée {m['d_audio_fr']} degrés. "
               f"Q N H {m['q_audio_fr']} hectopascals. "
@@ -114,6 +128,8 @@ async def executer_veille():
 
     await generer_audio(txt_fr, txt_en)
 
+    # HTML
+    ts = int(time.time())
     html_content = f"""<!DOCTYPE html><html lang="fr"><head><meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0"><title>ATIS LF8523</title>
     <style>
@@ -127,8 +143,8 @@ async def executer_veille():
         .alert-section {{ text-align: left; background: rgba(255, 204, 0, 0.1); border-left: 4px solid #ffcc00; padding: 15px; margin-bottom: 25px; }}
         .alert-line {{ color: #ffcc00; font-weight: bold; font-size: 0.9em; margin-bottom: 8px; }}
         audio {{ width: 100%; filter: invert(90%); margin-top: 10px; }}
-        .btn-refresh {{ background: #333; color: #ccc; border: 1px solid #444; padding: 8px 15px; border-radius: 5px; cursor: pointer; margin-top: 20px; font-size: 0.8em; transition: 0.3s; }}
-        .btn-refresh:hover {{ background: #444; color: #fff; }}
+        .btn-refresh {{ background: #333; color: #ccc; border: 1px solid #444; padding: 10px 20px; border-radius: 5px; cursor: pointer; margin-top: 20px; font-size: 0.85em; transition: 0.3s; font-weight: bold; }}
+        .btn-refresh:hover {{ background: #444; color: #fff; border-color: #666; }}
         .disclaimer {{ font-size: 0.7em; color: #ccc; margin-top: 30px; line-height: 1.4; font-style: italic; border-top: 1px solid #333; padding-top: 15px; text-align: justify; }}
     </style></head><body><div class="card">
     <h1>ATIS LF8523</h1><div class="subtitle">Atlantic Air Park</div>
@@ -144,10 +160,10 @@ async def executer_veille():
         <div class="alert-line">⚠️ RTBA R147 : {notams['R147']}</div>
     </div>
     <div class="label" style="margin-bottom:10px;">Écouter l'audio (Bilingue)</div>
-    <audio controls><source src="atis.mp3" type="audio/mpeg"></audio>
-    <button class="btn-refresh" onclick="window.location.reload()">🔄 Actualiser la page</button>
+    <audio controls><source src="atis.mp3?v={ts}" type="audio/mpeg"></audio>
+    <br><button class="btn-refresh" onclick="window.location.replace(window.location.pathname + '?refresh=' + Date.now())">🔄 Actualiser les données</button>
     <div class="disclaimer">
-        Valeurs issues des METAR LFBH (La Rochelle) et LFRI (La Roche-sur-Yon) moyennées. Les rafales correspondent à la valeur maximale observée. 
+        Valeurs issues des METAR LFBH (La Rochelle) et LFRI (La Roche-sur-Yon) moyennées. Les rafales correspondent à la valeur maximale observée.<br><br>
         Ce service est une aide à l'information. Atlantic Air Park ne saurait être tenu responsable en cas d'erreur ou d'omission. Seule la documentation officielle (SIA/Météo-France) fait foi.
     </div>
     </div></body></html>"""
