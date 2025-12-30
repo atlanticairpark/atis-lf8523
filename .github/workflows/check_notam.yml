@@ -45,6 +45,10 @@ jobs:
         uses: actions/upload-pages-artifact@v3
         with:
           path: '.'
+      - name: Run ATIS script
+        env:
+          ATIS_REMARQUES: ${{ secrets.ATIS_REMARQUES }}
+        run: python script.py
 
       - name: Deploy to GitHub Pages
         id: deployment
