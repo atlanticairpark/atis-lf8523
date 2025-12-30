@@ -5,7 +5,7 @@ import asyncio
 import edge_tts
 
 # Configuration
-ICAO = "LFBH"
+STATIONS = ["LFBH", "LFRI"]
 
 def formater_chiffre_fr(n):
     """Gère la diction spécifique : 'unité' pour 1 et suppression du zéro initial."""
@@ -13,70 +13,68 @@ def formater_chiffre_fr(n):
     if n_str == "1": return "unité"
     return n_str.lstrip('0') if len(n_str) > 1 and n_str.startswith('0') else n_str
 
-def obtenir_metar(icao):
-    url = f"https://tgftp.nws.noaa.gov/data/observations/metar/stations/{icao}.TXT"
-    try:
-        response = requests.get(url, timeout=10)
-        metar = response.text.split('\n')[1]
-        
-        time_match = re.search(r' (\d{2})(\d{2})(\d{2})Z', metar)
-        h_tele = f"{time_match.group(2)}:{time_match.group(3)}"
-        
-        # --- VENT ---
-        w_dir_visu, w_spd_visu = "000", "0"
-        w_audio_fr, w_audio_en = "", ""
+def obtenir_donnees_moyennes():
+    temps, rosees, qnhs, vents_dir, vents_spd = [], [], [], [], []
+    h_tele = "--:--"
 
-        if "00000KT" in metar:
-            w_dir_visu, w_spd_visu = "CALME", "0"
-            w_audio_fr, w_audio_en = "vent calme", "wind calm"
-        else:
-            w_match = re.search(r' ([A-Z0-9]{3})(\d{2})(G\d{2})?KT', metar)
-            if w_match:
-                d, s, g = w_match.group(1), w_match.group(2), w_match.group(3)
-                w_dir_visu = d
-                if d == "VRB":
-                    w_audio_fr, w_audio_en = "vent variable", "wind variable"
-                else:
-                    d_en = " ".join(list(d)).replace('0', 'zero').replace('1', 'one')
-                    w_audio_fr = f"vent {d} degrés"
-                    w_audio_en = f"wind {d_en} degrees"
+    for icao in STATIONS:
+        url = f"https://tgftp.nws.noaa.gov/data/observations/metar/stations/{icao}.TXT"
+        try:
+            res = requests.get(url, timeout=10)
+            if res.status_code == 200:
+                lines = res.text.split('\n')
+                if len(lines) < 2: continue
+                metar = lines[1]
                 
-                spd = s.lstrip('0') or "0"
-                w_spd_visu = s
-                w_audio_fr += f", {spd} nœuds"
-                w_audio_en += f", {spd} knots"
-                
-                if g:
-                    gst = g.replace('G', '').lstrip('0')
-                    w_spd_visu += f"G{gst}"
-                    w_audio_fr += f", rafales {gst} nœuds"
-                    w_audio_en += f", gusts {gst} knots"
+                # Heure (on garde la dernière lue)
+                time_match = re.search(r' (\d{2})(\d{2})(\d{2})Z', metar)
+                if time_match:
+                    h_tele = f"{time_match.group(2)}:{time_match.group(3)}"
 
-        # --- QNH ---
-        q_match = re.search(r'Q(\d{4})', metar)
-        q_val = q_match.group(1) if q_match else "1013"
-        q_fr_elements = [formater_chiffre_fr(c) for c in list(q_val)]
-        q_fr_rapide = " ".join(q_fr_elements)
-        q_en = " ".join(list(q_val))
+                # Temp/Rosée
+                tr_match = re.search(r' (M?\d{2})/(M?\d{2}) ', metar)
+                if tr_match:
+                    temps.append(int(tr_match.group(1).replace('M', '-')))
+                    rosees.append(int(tr_match.group(2).replace('M', '-')))
 
-        # --- TEMP / ROSÉE ---
-        t_match = re.search(r' (M?\d{2})/(M?\d{2}) ', metar)
-        t_raw, d_raw = t_match.group(1), t_match.group(2)
-        
-        def dict_temp(val, lang):
-            neg = "moins " if "M" in val and lang=="fr" else "minus " if "M" in val else ""
-            num = val.replace('M', '').lstrip('0') or "0"
-            return f"{neg}{num}"
+                # QNH
+                q_match = re.search(r'Q(\d{4})', metar)
+                if q_match: qnhs.append(int(q_match.group(1)))
 
-        return {
-            "heure_metar": h_tele, "qnh": q_val, "q_audio_fr": q_fr_rapide, "q_audio_en": q_en,
-            "temp_visu": t_raw.replace('M', '-'), "dew_visu": d_raw.replace('M', '-'),
-            "t_audio_fr": dict_temp(t_raw, "fr"), "d_audio_fr": dict_temp(d_raw, "fr"),
-            "t_audio_en": dict_temp(t_raw, "en"), "d_audio_en": dict_temp(d_raw, "en"),
-            "w_dir_visu": w_dir_visu, "w_spd_visu": w_spd_visu,
-            "w_audio_fr": w_audio_fr, "w_audio_en": w_audio_en
-        }
-    except: return None
+                # Vent
+                w_match = re.search(r' (\d{3})(\d{2})KT', metar)
+                if w_match:
+                    vents_dir.append(int(w_match.group(1)))
+                    vents_spd.append(int(w_match.group(2)))
+        except: continue
+
+    if not qnhs: return None
+
+    # Calcul des moyennes
+    m_t = round(sum(temps) / len(temps))
+    m_r = round(sum(rosees) / len(rosees))
+    m_q = round(sum(qnhs) / len(qnhs))
+    m_wd = round(sum(vents_dir) / len(vents_dir))
+    m_ws = round(sum(vents_spd) / len(vents_spd))
+
+    # Préparation Audio QNH
+    q_str = str(m_q)
+    q_audio_fr = " ".join([formater_chiffre_fr(c) for c in list(q_str)])
+    
+    # Préparation Audio Vent EN
+    wd_en = " ".join(list(str(m_wd).zfill(3))).replace('0','zero').replace('1','one')
+
+    return {
+        "heure_metar": h_tele, "qnh": q_str, "q_audio_fr": q_audio_fr, "q_audio_en": " ".join(list(q_str)),
+        "temp_visu": str(m_t), "dew_visu": str(m_r),
+        "t_audio_fr": (("moins " if m_t < 0 else "") + formater_chiffre_fr(abs(m_t))),
+        "d_audio_fr": (("moins " if m_r < 0 else "") + formater_chiffre_fr(abs(m_r))),
+        "t_audio_en": (("minus " if m_t < 0 else "") + str(abs(m_t))),
+        "d_audio_en": (("minus " if m_r < 0 else "") + str(abs(m_r))),
+        "w_dir_visu": str(m_wd).zfill(3), "w_spd_visu": str(m_ws),
+        "w_audio_fr": f"vent {m_wd} degrés, {m_ws} nœuds",
+        "w_audio_en": f"wind {wd_en} degrees, {m_ws} knots"
+    }
 
 def scanner_notams():
     resultats = {"R147": "pas d'information"}
@@ -102,16 +100,18 @@ async def generer_audio(vocal_fr, vocal_en):
         if os.path.exists(f): os.remove(f)
 
 async def executer_veille():
-    m = obtenir_metar(ICAO)
+    m = obtenir_donnees_moyennes()
     notams = scanner_notams()
     if not m: return
 
+    # --- AUDIO FR ---
     txt_fr = (f"Atlantic Air Park, observation de {m['heure_metar'].replace(':',' heures ')} UTC. "
               f"{m['w_audio_fr']}. Température {m['t_audio_fr']} degrés. Point de rosée {m['d_audio_fr']} degrés. "
               f"Q N H {m['q_audio_fr']} hectopascals. "
               f"Piste en herbe zéro huit vingt-six fermée cause travaux. Prudence. Péril aviaire. "
               f"Zone R 147 : {notams['R147']}.")
 
+    # --- AUDIO EN ---
     txt_en = (f"Atlantic Air Park observation at {m['heure_metar'].replace(':',' ')} UTC. "
               f"{m['w_audio_en']}. Temperature {m['t_audio_en']} degrees. Dew point {m['d_audio_en']} degrees. "
               f"Q N H {m['q_audio_en']} hectopascals. Grass runway zero eight twenty-six closed due to works. Caution. Bird hazard. "
@@ -119,6 +119,7 @@ async def executer_veille():
 
     await generer_audio(txt_fr, txt_en)
 
+    # --- HTML VISUEL ---
     html_content = f"""<!DOCTYPE html><html lang="fr"><head><meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0"><title>ATIS LF8523</title>
     <style>
@@ -131,23 +132,27 @@ async def executer_veille():
         .value {{ font-size: 1.2em; font-weight: bold; color: #fff; margin-top:5px; }}
         .alert-section {{ text-align: left; background: rgba(255, 204, 0, 0.1); border-left: 4px solid #ffcc00; padding: 15px; margin-bottom: 25px; }}
         .alert-line {{ color: #ffcc00; font-weight: bold; font-size: 0.9em; margin-bottom: 8px; }}
-        audio {{ width: 100%; filter: invert(90%); }}
+        audio {{ width: 100%; filter: invert(90%); margin-top: 10px; }}
+        .disclaimer {{ font-size: 0.65em; color: #555; margin-top: 30px; line-height: 1.4; font-style: italic; border-top: 1px solid #222; padding-top: 15px; }}
     </style></head><body><div class="card">
     <h1>ATIS LF8523</h1><div class="subtitle">Atlantic Air Park</div>
     <div class="data-grid">
-        <div class="data-item"><div class="label">Heure</div><div class="value">⌚ {m['heure_metar']}Z</div></div>
+        <div class="data-item"><div class="label">Heure (Moyenne)</div><div class="value">⌚ {m['heure_metar']}Z</div></div>
         <div class="data-item"><div class="label">Vent</div><div class="value">🌬 {m['w_dir_visu']} / {m['w_spd_visu']}kt</div></div>
         <div class="data-item"><div class="label">Temp / Rosée</div><div class="value">🌡 {m['temp_visu']}° / {m['dew_visu']}°</div></div>
         <div class="data-item"><div class="label">QNH</div><div class="value">💎 {m['qnh']} hPa</div></div>
     </div>
     <div class="alert-section">
         <div class="alert-line">⚠️ Piste en herbe 08/26 fermée cause travaux</div>
-        <div class="alert-line">⚠️ Prudence</div>
-        <div class="alert-line">⚠️ Péril aviaire</div>
+        <div class="alert-line">⚠️ Prudence / Péril aviaire</div>
         <div class="alert-line">⚠️ RTBA R147 : {notams['R147']}</div>
     </div>
-    <div class="label" style="margin-bottom:10px;">Écouter l'audio</div>
+    <div class="label" style="margin-bottom:10px;">Écouter l'audio (Bilingue)</div>
     <audio controls autoplay><source src="atis.mp3" type="audio/mpeg"></audio>
+    <div class="disclaimer">
+        Valeurs issues des METAR LFBH (La Rochelle) et LFRI (La Roche-sur-Yon) moyennées.<br>
+        Ce service est une aide à l'information. Atlantic Air Park ne saurait être tenu responsable en cas d'erreur ou d'omission. Seule la documentation officielle (SIA/Météo-France) fait foi.
+    </div>
     </div></body></html>"""
 
     with open("index.html", "w", encoding="utf-8") as f: f.write(html_content)
