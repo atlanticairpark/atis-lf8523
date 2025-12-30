@@ -28,12 +28,18 @@ jobs:
         env:
           TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
-        run: python script.py
 
-      - name: Commit and Push changes
+          - name: Commit and Push changes
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           git config --local user.email "action@github.com"
           git config --local user.name "GitHub Action"
           git add index.html atis.mp3
+          # Le "|| exit 0" évite que le script plante s'il n'y a aucun changement
           git commit -m "Mise à jour automatique de l'ATIS" || exit 0
-          git push
+          # On utilise le token pour s'authentifier lors du push
+          git push https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git HEAD:main
+        run: python script.py
+
+      
