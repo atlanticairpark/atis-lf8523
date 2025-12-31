@@ -132,13 +132,13 @@ async def executer_veille():
     html_content = f"""<!DOCTYPE html><html lang="fr"><head><meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>ATIS LF8523</title>
-    
+
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <meta name="apple-mobile-web-app-title" content="ATIS LF8523">
-    <link rel="apple-touch-icon" href="icon.png">
-    <link rel="icon" type="image/png" href="icon.png">
-    <link rel="manifest" href="manifest.json">
+    <link rel="apple-touch-icon" href="icon.png?v=2">
+    <link rel="icon" type="image/png" href="icon.png?v=2">
+    <link rel="manifest" href="manifest.json?v=2">
+
 
     <style>
         body {{ font-family: sans-serif; text-align: center; padding: 20px; background: #121212; color: #e0e0e0; min-height: 100vh; display: flex; align-items: center; justify-content: center; margin: 0; }}
