@@ -1,14 +1,9 @@
 <!DOCTYPE html><html lang="fr"><head><meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>ATIS LF8523</title>
-
-    <meta name="apple-mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <link rel="manifest" href="manifest.json?v=2">
     <link rel="apple-touch-icon" href="icon.png?v=2">
     <link rel="icon" type="image/png" href="icon.png?v=2">
-    <link rel="manifest" href="manifest.json?v=2">
-
-
     <style>
         body { font-family: sans-serif; text-align: center; padding: 20px; background: #121212; color: #e0e0e0; min-height: 100vh; display: flex; align-items: center; justify-content: center; margin: 0; }
         .card { background: #1e1e1e; padding: 25px; border-radius: 15px; max-width: 500px; width: 90%; border: 1px solid #333; box-shadow: 0 10px 30px rgba(0,0,0,0.5); }
@@ -22,25 +17,21 @@
         .alert-line { color: #ffcc00; font-weight: bold; font-size: 0.9em; margin-bottom: 8px; }
         audio { width: 100%; filter: invert(90%); margin-top: 10px; }
         .btn-refresh { background: #333; color: #ccc; border: 1px solid #444; padding: 12px 20px; border-radius: 8px; cursor: pointer; margin-top: 20px; font-size: 0.9em; transition: 0.3s; font-weight: bold; width: 100%; }
-        .btn-refresh:hover { background: #444; color: #fff; border-color: #666; }
         .disclaimer { font-size: 0.7em; color: #ccc; margin-top: 30px; line-height: 1.4; font-style: italic; border-top: 1px solid #333; padding-top: 15px; text-align: justify; }
     </style></head><body><div class="card">
     <h1>ATIS LF8523</h1><div class="subtitle">Atlantic Air Park</div>
     <div class="data-grid">
-        <div class="data-item"><div class="label">Heure (UTC)</div><div class="value">⌚ 11:30Z</div></div>
-        <div class="data-item"><div class="label">Vent</div><div class="value">🌬 190 / 3kt</div></div>
-        <div class="data-item"><div class="label">Temp / Rosée</div><div class="value">🌡 0° / 0°</div></div>
-        <div class="data-item"><div class="label">QNH</div><div class="value">💎 1014 hPa</div></div>
+        <div class="data-item"><div class="label">Heure (UTC)</div><div class="value">⌚ 14:00Z</div></div>
+        <div class="data-item"><div class="label">Vent</div><div class="value">🌬 220 / 2kt</div></div>
+        <div class="data-item"><div class="label">Temp / Rosée</div><div class="value">🌡 2° / 2°</div></div>
+        <div class="data-item"><div class="label">QNH</div><div class="value">💎 1013 hPa</div></div>
     </div>
     <div class="alert-section">
         <div class="alert-line">⚠️ Attention</div><div class="alert-line">⚠️ Piste en herbe 08 26 non balisée et fermée cause travaux</div><div class="alert-line">⚠️ Péril aviaire</div>
         <div class="alert-line">⚠️ RTBA R147 : pas d'information</div>
         <div class="alert-line" style="color:#4dabff; font-size: 0.85em;">🔹 TEST R45A : pas d'information</div>
     </div>
-    <div class="label" style="margin-bottom:10px;">Écouter l'audio (Bilingue)</div>
-    <audio controls><source src="atis.mp3?v=1767440691" type="audio/mpeg"></audio>
-    <br><button class="btn-refresh" onclick="window.location.replace(window.location.pathname + '?refresh=' + Date.now())">🔄 Actualiser les données</button>
-    <div class="disclaimer">
-        Valeurs issues des METAR LFBH et LFRI moyennées. Les rafales correspondent au max observé. Seule la documentation officielle (SIA) fait foi.
-    </div>
+    <audio controls><source src="atis.mp3?v=1767449558" type="audio/mpeg"></audio>
+    <button class="btn-refresh" onclick="window.location.reload()">🔄 Actualiser les données</button>
+    <div class="disclaimer">Valeurs issues des moyennes LFBH/LFRI. Seule la doc officielle fait foi.</div>
     </div></body></html>
