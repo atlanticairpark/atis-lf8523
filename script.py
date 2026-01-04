@@ -73,32 +73,30 @@ def obtenir_donnees_moyennes():
     }
 
 def scanner_notams():
-    # FIRs : Brest, Paris, Reims, Marseille
     firs = ["LFRR", "LFFF", "LFEE", "LFMM"]
     status = {"R147": "pas d'information", "R45A": "pas d'information"}
     
     for fir in firs:
         try:
-            # Appel à l'API de données NOTAM (via proxy pour éviter CORS/Blocages)
+            # On utilise le service allorigins pour récupérer les données de l'API FAA qui renvoie du JSON
             url = f"https://api.allorigins.win/get?url=" + requests.utils.quote(f"https://notams.aim.faa.gov/notamSearch/search?searchType=0&designators={fir}&sortOrder=0")
             res = requests.get(url, timeout=15)
             if res.status_code == 200:
-                text_data = res.text.upper()
+                data = res.json()
+                # On cherche le texte brut dans la réponse JSON
+                full_text = str(data.get("contents", "")).upper()
+                
                 for zone in ["R147", "R45A"]:
-                    # Si on a déjà trouvé l'info pour une zone, on ne l'écrase pas avec un "pas d'info" d'un autre FIR
                     if status[zone] != "pas d'information": continue
-
-                    # Recherche du bloc spécifique à la zone dans le texte brut
-                    # Format SIA : ZONE R45A ... 1430-1600:ACTIVE
-                    match = re.search(rf"{zone}.*?(\d{{4}}[-/]\d{{4}})", text_data)
+                    
+                    # On cherche la zone et on capture le créneau horaire (ex: 1430-1600)
+                    match = re.search(rf"{zone}.{{1,500}}?(\d{{4}}[-/]\d{{4}})", full_text)
                     if match:
                         t = match.group(1).replace('/', '-')
                         status[zone] = f"active de {t[:2]}:{t[2:4]} à {t[-4:-2]}:{t[-2:]}"
-                    elif zone in text_data:
+                    elif zone in full_text:
                         status[zone] = "citée (vérifier SIA)"
-        except:
-            continue
-            
+        except: continue
     return status
 
 async def generer_audio(vocal_fr, vocal_en):
@@ -106,7 +104,8 @@ async def generer_audio(vocal_fr, vocal_en):
     await edge_tts.Communicate(vocal_en, "en-GB-ThomasNeural", rate="+10%").save("en.mp3")
     with open("atis.mp3", "wb") as f:
         for fname in ["fr.mp3", "en.mp3"]:
-            with open(fname, "rb") as fd: f.write(fd.read())
+            if os.path.exists(fname):
+                with open(fname, "rb") as fd: f.write(fd.read())
     if os.path.exists("fr.mp3"): os.remove("fr.mp3")
     if os.path.exists("en.mp3"): os.remove("en.mp3")
 
@@ -115,19 +114,25 @@ async def executer_veille():
     notams = scanner_notams()
     if not m: return
 
-    remarques_raw = os.getenv("ATIS_REMARQUES", "Prudence R45A demain :: Caution R45A tomorrow")
+    remarques_raw = os.getenv("ATIS_REMARQUES", "Piste en herbe 08/26 fermée cause travaux | Prudence :: Grass runway 08/26 closed due to works | Caution")
     partie_fr, partie_en = remarques_raw.split("::") if "::" in remarques_raw else (remarques_raw, "Caution")
+    liste_fr = [r.strip() for r in partie_fr.split("|")]
+    liste_en = [r.strip() for r in partie_en.split("|")]
     
-    html_remarques = "".join([f'<div class="alert-line">⚠️ {r.strip()}</div>' for r in partie_fr.split("|")])
+    html_remarques = "".join([f'<div class="alert-line">⚠️ {r}</div>' for r in liste_fr])
+    audio_rem_fr = ". ".join(liste_fr) + "."
+    audio_rem_en = ". ".join(liste_en) + "."
 
     notam_txt_fr = f"Zone R 147 : {notams['R147']}."
     if "active" in notams['R45A']: notam_txt_fr += f" Notez zone R 45 alpha {notams['R45A']}."
 
     txt_fr = (f"Atlantic Air Park, observation de {m['heure_metar'].replace(':',' heures ')} UTC. "
-              f"{m['w_audio_fr']}. Q N H {m['q_audio_fr']}. {notam_txt_fr}")
+              f"{m['w_audio_fr']}. Température {m['t_audio_fr']} degrés. Point de rosée {m['d_audio_fr']} degrés. "
+              f"Q N H {m['q_audio_fr']} hectopascals. {audio_rem_fr} {notam_txt_fr}")
 
     txt_en = (f"Atlantic Air Park observation at {m['heure_metar'].replace(':',' ')} UTC. "
-              f"{m['w_audio_en']}. Q N H {m['q_audio_en']}. Check R 147 and R 45 alpha.")
+              f"{m['w_audio_en']}. Temperature {m['t_audio_en']} degrees. Dew point {m['d_audio_en']} degrees. "
+              f"Q N H {m['q_audio_en']} hectopascals. {audio_rem_en} Check NOTAM for R 147 and R 45 alpha.")
 
     await generer_audio(txt_fr, txt_en)
     ts = int(time.time())
