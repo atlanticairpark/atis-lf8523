@@ -78,25 +78,34 @@ def scanner_notams():
     
     for fir in firs:
         try:
-            # On utilise le service allorigins pour récupérer les données de l'API FAA qui renvoie du JSON
+            # On interroge l'API officielle
             url = f"https://api.allorigins.win/get?url=" + requests.utils.quote(f"https://notams.aim.faa.gov/notamSearch/search?searchType=0&designators={fir}&sortOrder=0")
             res = requests.get(url, timeout=15)
             if res.status_code == 200:
-                data = res.json()
-                # On cherche le texte brut dans la réponse JSON
-                full_text = str(data.get("contents", "")).upper()
+                import json
+                # On décode le JSON imbriqué par AllOrigins
+                raw_data = res.json()
+                data = json.loads(raw_data['contents'])
                 
-                for zone in ["R147", "R45A"]:
-                    if status[zone] != "pas d'information": continue
+                # On parcourt chaque NOTAM un par un
+                for notam in data.get("notamList", []):
+                    # On récupère le texte du NOTAM (souvent dans 'icaoMessage' ou 'traditionalMessage')
+                    msg = (notam.get("traditionalMessage", "") + notam.get("icaoMessage", "")).upper()
                     
-                    # On cherche la zone et on capture le créneau horaire (ex: 1430-1600)
-                    match = re.search(rf"{zone}.{{1,500}}?(\d{{4}}[-/]\d{{4}})", full_text)
-                    if match:
-                        t = match.group(1).replace('/', '-')
-                        status[zone] = f"active de {t[:2]}:{t[2:4]} à {t[-4:-2]}:{t[-2:]}"
-                    elif zone in full_text:
-                        status[zone] = "citée (vérifier SIA)"
-        except: continue
+                    for zone in ["R147", "R45A"]:
+                        if status[zone] != "pas d'information": continue
+                        
+                        if zone in msg:
+                            # On cherche le créneau horaire dans ce NOTAM précis
+                            match = re.search(r"(\d{4})[-/](\d{4})", msg)
+                            if match:
+                                t = match.group(1).replace('/', '-')
+                                status[zone] = f"active de {t[:2]}:{t[2:4]} à {t[-4:-2]}:{t[-2:]}"
+                            else:
+                                status[zone] = "citée (voir SIA)"
+        except Exception as e:
+            print(f"Erreur FIR {fir}: {e}")
+            continue
     return status
 
 async def generer_audio(vocal_fr, vocal_en):
