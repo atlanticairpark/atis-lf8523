@@ -74,7 +74,9 @@ def obtenir_donnees_moyennes():
 
 def scanner_notams():
     firs = ["LFRR", "LFFF", "LFEE", "LFMM"]
-    status = {"R147": "pas d'information", "R45A": "pas d'information"}
+    # À la place de status = {"R147": "...", "R45A": "..."}
+status = {"R147": f"DEBUG: {len(combined_text)} car.", "R45A": "En attente"}
+    
     combined_text = ""
     
     for fir in firs:
