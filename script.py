@@ -65,13 +65,11 @@ def obtenir_donnees_moyennes():
 
 def scanner_notams():
     status = {"R147": "pas d'information", "R45A": "pas d'information", "DEBUG": ""}
-    # On multiplie les sources : FAA et NotamInfo
     urls = [
         "https://notaminfo.com/france/notams",
         "https://www.notams.faa.gov/common/icao/LFFF.html",
         "https://www.notams.faa.gov/common/icao/LFRR.html"
     ]
-    
     combined_text = ""
     for u in urls:
         try:
@@ -81,10 +79,7 @@ def scanner_notams():
         except: continue
     
     combined_text = " ".join(combined_text.split())
-    status["DEBUG"] = f"Scan OK ({len(combined_text)} car.)"
-
     for zone in ["R147", "R45A"]:
-        # Recherche ultra-permissive : Nom de zone + n'importe quoi + (HHMM-HHMM ou HHMM/HHMM)
         match = re.search(rf"{zone}.*?(\d{{4}}[-/]\d{{4}})", combined_text)
         if match:
             t = match.group(1).replace('/', '-')
@@ -101,46 +96,49 @@ async def generer_audio(vocal_fr, vocal_en):
         for fname in ["fr.mp3", "en.mp3"]:
             if os.path.exists(fname):
                 with open(fname, "rb") as fd: f.write(fd.read())
-    if os.path.exists("fr.mp3"): os.remove("fr.mp3")
-    if os.path.exists("en.mp3"): os.remove("en.mp3")
+    for f in ["fr.mp3", "en.mp3"]:
+        if os.path.exists(f): os.remove(f)
 
 async def executer_veille():
     m = obtenir_donnees_moyennes()
     notams = scanner_notams()
     if not m: return
 
-    remarques_raw = os.getenv("ATIS_REMARQUES", "Piste en herbe 08/26 fermée cause travaux | Prudence :: Grass runway 08/26 closed due to works | Caution")
+    remarques_raw = os.getenv("ATIS_REMARQUES", "Prudence R45A :: Caution R45A")
     partie_fr, partie_en = remarques_raw.split("::") if "::" in remarques_raw else (remarques_raw, "Caution")
     
-    # Audio FR
+    # Audio
     notam_fr = f"Zone R 147 : {notams['R147']}. Zone R 45 alpha : {notams['R45A']}."
     txt_fr = (f"Atlantic Air Park, observation de {m['heure_metar'].replace(':',' heures ')}. "
-              f"{m['w_audio_fr']}. Température {m['t_audio_fr']} degrés. Point de rosée {m['d_audio_fr']} degrés. "
-              f"Q N H {m['q_audio_fr']} hectopascals. {partie_fr}. {notam_fr}")
-
-    # Audio EN
+              f"{m['w_audio_fr']}. Température {m['t_audio_fr']}. Rosée {m['d_audio_fr']}. "
+              f"Q N H {m['q_audio_fr']}. {partie_fr}. {notam_fr}")
+    
     txt_en = (f"Atlantic Air Park observation at {m['heure_metar'].replace(':',' ')}. "
-              f"{m['w_audio_en']}. Temperature {m['t_audio_en']} degrees. Dew point {m['d_audio_en']} degrees. "
-              f"Q N H {m['q_audio_en']} hectopascals. {partie_en}. Check NOTAM for R 147 and R 45 alpha.")
+              f"{m['w_audio_en']}. Temperature {m['t_audio_en']}. Dew point {m['d_audio_en']}. "
+              f"Q N H {m['q_audio_en']}. {partie_en}. Check R 147 and R 45 alpha.")
 
     await generer_audio(txt_fr, txt_en)
     ts = int(time.time())
 
-    # HTML
+    # HTML Complet avec Bouton et Disclaimer
     html_content = f"""<!DOCTYPE html><html lang="fr"><head><meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>ATIS LF8523</title>
     <style>
         body {{ font-family: sans-serif; text-align: center; padding: 20px; background: #121212; color: #e0e0e0; }}
         .card {{ background: #1e1e1e; padding: 25px; border-radius: 15px; max-width: 500px; margin: auto; border: 1px solid #333; }}
-        h1 {{ color: #fff; }} .subtitle {{ color: #4dabff; font-weight: bold; margin-bottom: 25px; }}
+        h1 {{ color: #fff; margin-bottom: 5px; }}
+        .subtitle {{ color: #4dabff; font-weight: bold; margin-bottom: 25px; }}
         .data-grid {{ display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 25px; }}
         .data-item {{ background: #2a2a2a; padding: 15px; border-radius: 10px; border: 1px solid #3d3d3d; }}
         .label {{ font-size: 0.75em; color: #888; text-transform: uppercase; }}
         .value {{ font-size: 1.2em; font-weight: bold; color: #fff; }}
         .alert-section {{ text-align: left; background: rgba(255, 204, 0, 0.1); border-left: 4px solid #ffcc00; padding: 15px; margin-bottom: 25px; }}
         .alert-line {{ color: #ffcc00; font-weight: bold; font-size: 0.9em; margin-bottom: 8px; }}
-        audio {{ width: 100%; filter: invert(90%); }}
+        audio {{ width: 100%; filter: invert(90%); margin-bottom: 20px; }}
+        .btn-refresh {{ background: #333; color: #ccc; border: 1px solid #444; padding: 12px 20px; border-radius: 8px; cursor: pointer; width: 100%; font-weight: bold; transition: 0.3s; }}
+        .btn-refresh:hover {{ background: #444; color: #fff; }}
+        .disclaimer {{ font-size: 0.7em; color: #666; margin-top: 30px; line-height: 1.4; text-align: justify; border-top: 1px solid #333; padding-top: 15px; }}
     </style></head><body><div class="card">
     <h1>ATIS LF8523</h1><div class="subtitle">Atlantic Air Park</div>
     <div class="data-grid">
@@ -154,7 +152,8 @@ async def executer_veille():
         <div class="alert-line" style="color:#4dabff;">⚠️ RTBA R45A : {notams['R45A']}</div>
     </div>
     <audio controls><source src="atis.mp3?v={ts}" type="audio/mpeg"></audio>
-    <div style="font-size:0.7em; color:#444; margin-top:15px;">{notams['DEBUG']}</div>
+    <button class="btn-refresh" onclick="window.location.reload()">🔄 ACTUALISER LES DONNÉES</button>
+    <div class="disclaimer"><b>ATTENTION :</b> Ce système est une aide à l'information automatisée utilisant des sources METAR et NOTAM tierces. Ces données ne remplacent pas les publications officielles du SIA. Vérifiez toujours l'AZBA et les NOTAMs avant le vol.</div>
     </div></body></html>"""
 
     with open("index.html", "w", encoding="utf-8") as f: f.write(html_content)
