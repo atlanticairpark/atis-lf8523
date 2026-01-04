@@ -97,13 +97,28 @@ def obtenir_donnees_moyennes():
 def scanner_notams():
     status = {"R147": "pas d'information", "R45A": "pas d'information"}
     try:
+        # On interroge la source (LFRR pour l'Ouest, mais le flux contient souvent les RTBA nationales)
         res = requests.get("https://api.allorigins.win/get?url=" + requests.utils.quote("https://www.notams.faa.gov/common/icao/LFRR.html"), timeout=15)
-        texte = res.text.upper()
+        # On remplace les sauts de ligne par des espaces pour que la regex ne bloque pas
+        texte = res.text.upper().replace('\n', ' ').replace('\r', ' ')
+        
         for zone in ["R147", "R45A"]:
-            match = re.search(f"{zone}.*?(\\d{{4}}.*?TO.*?\\d{{4}})", texte)
+            # Cette regex cherche le nom de la zone, puis ignore le texte jusqu'à trouver 
+            # un format type 1430-1600:ACTIVE
+            match = re.search(rf"{zone}.*?(\d{{4}}-\d{{4}}:ACTIVE)", texte)
+            
             if match:
-                status[zone] = f"active de {match.group(1).replace('TO', 'à')}"
-    except: pass
+                # On extrait "1430-1600:ACTIVE" et on le rend plus lisible
+                info = match.group(1).replace(':ACTIVE', '').replace('-', ' à ')
+                # On ajoute un formattage pour que ce soit propre (ex: 14:30 à 16:00)
+                h_debut = info[:2] + ":" + info[2:4]
+                h_fin = info[-5:-3] + ":" + info[-2:]
+                status[zone] = f"active de {h_debut} à {h_fin}"
+            elif zone in texte:
+                # Sécurité : si la zone est citée mais que le format horaire diffère
+                status[zone] = "citée dans un NOTAM (vérifier SIA)"
+    except:
+        pass
     return status
 
 async def generer_audio(vocal_fr, vocal_en):
