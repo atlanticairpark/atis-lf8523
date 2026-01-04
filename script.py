@@ -64,29 +64,18 @@ def obtenir_donnees_moyennes():
     }
 
 def scanner_notams():
-    status = {"R147": "pas d'information", "R45A": "pas d'information", "DEBUG": ""}
-    urls = [
-        "https://notaminfo.com/france/notams",
-        "https://www.notams.faa.gov/common/icao/LFFF.html",
-        "https://www.notams.faa.gov/common/icao/LFRR.html"
-    ]
-    combined_text = ""
-    for u in urls:
-        try:
-            res = requests.get("https://api.allorigins.win/get?url=" + requests.utils.quote(u), timeout=10)
-            if res.status_code == 200:
-                combined_text += re.sub(r'<[^>]+>', ' ', res.text.upper()) + " "
-        except: continue
-    
-    combined_text = " ".join(combined_text.split())
-    for zone in ["R147", "R45A"]:
-        match = re.search(rf"{zone}.*?(\d{{4}}[-/]\d{{4}})", combined_text)
-        if match:
-            t = match.group(1).replace('/', '-')
-            status[zone] = f"active de {t[:2]}:{t[2:4]} à {t[-4:-2]}:{t[-2:]}"
-        elif zone in combined_text:
-            status[zone] = "citée (vérifier SIA)"
-            
+    status = {"R147": "pas d'information", "R45A": "pas d'information"}
+    try:
+        url = "https://api.allorigins.win/get?url=" + requests.utils.quote("https://notaminfo.com/france/notams")
+        res = requests.get(url, timeout=10)
+        if res.status_code == 200:
+            txt = res.text.upper()
+            for zone in ["R147", "R45A"]:
+                match = re.search(rf"{zone}.*?(\d{{4}}[-/]\d{{4}})", txt)
+                if match:
+                    t = match.group(1).replace('/', '-')
+                    status[zone] = f"active de {t[:2]}:{t[2:4]} à {t[-4:-2]}:{t[-2:]}"
+    except: pass
     return status
 
 async def generer_audio(vocal_fr, vocal_en):
@@ -104,31 +93,34 @@ async def executer_veille():
     notams = scanner_notams()
     if not m: return
 
-    remarques_raw = os.getenv("ATIS_REMARQUES", "Prudence R45A :: Caution R45A")
+    # Gestion des remarques bilingues (Secret GitHub ou défaut)
+    remarques_raw = os.getenv("ATIS_REMARQUES", "Piste en herbe 08/26 fermée cause travaux | Prudence :: Grass runway 08/26 closed due to work | Caution")
     partie_fr, partie_en = remarques_raw.split("::") if "::" in remarques_raw else (remarques_raw, "Caution")
     
-    # Audio
-    notam_fr = f"Zone R 147 : {notams['R147']}. Zone R 45 alpha : {notams['R45A']}."
+    # Audio FR
+    audio_notam_fr = f"Zone R 147 : {notams['R147']}. Zone R 45 alpha : {notams['R45A']}."
     txt_fr = (f"Atlantic Air Park, observation de {m['heure_metar'].replace(':',' heures ')}. "
-              f"{m['w_audio_fr']}. Température {m['t_audio_fr']}. Rosée {m['d_audio_fr']}. "
-              f"Q N H {m['q_audio_fr']}. {partie_fr}. {notam_fr}")
-    
+              f"{m['w_audio_fr']}. Température {m['t_audio_fr']} degrés. Rosée {m['d_audio_fr']} degrés. "
+              f"Q N H {m['q_audio_fr']} hectopascals. {partie_fr}. {audio_notam_fr}")
+
+    # Audio EN
+    audio_notam_en = f"R 147 status: {notams['R147']}. R 45 alpha status: {notams['R45A']}."
     txt_en = (f"Atlantic Air Park observation at {m['heure_metar'].replace(':',' ')}. "
-              f"{m['w_audio_en']}. Temperature {m['t_audio_en']}. Dew point {m['d_audio_en']}. "
-              f"Q N H {m['q_audio_en']}. {partie_en}. Check R 147 and R 45 alpha.")
+              f"{m['w_audio_en']}. Temperature {m['t_audio_en']} degrees. Dew point {m['d_audio_en']} degrees. "
+              f"Q N H {m['q_audio_en']} hectopascals. {partie_en}. {audio_notam_en}")
 
     await generer_audio(txt_fr, txt_en)
     ts = int(time.time())
 
-    # HTML Complet avec Bouton et Disclaimer
+    # HTML Complet Restauré
     html_content = f"""<!DOCTYPE html><html lang="fr"><head><meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>ATIS LF8523</title>
     <style>
         body {{ font-family: sans-serif; text-align: center; padding: 20px; background: #121212; color: #e0e0e0; }}
-        .card {{ background: #1e1e1e; padding: 25px; border-radius: 15px; max-width: 500px; margin: auto; border: 1px solid #333; }}
+        .card {{ background: #1e1e1e; padding: 25px; border-radius: 15px; max-width: 500px; margin: auto; border: 1px solid #333; box-shadow: 0 10px 30px rgba(0,0,0,0.5); }}
         h1 {{ color: #fff; margin-bottom: 5px; }}
-        .subtitle {{ color: #4dabff; font-weight: bold; margin-bottom: 25px; }}
+        .subtitle {{ color: #4dabff; font-weight: bold; margin-bottom: 25px; text-transform: uppercase; font-size: 0.9em; }}
         .data-grid {{ display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 25px; }}
         .data-item {{ background: #2a2a2a; padding: 15px; border-radius: 10px; border: 1px solid #3d3d3d; }}
         .label {{ font-size: 0.75em; color: #888; text-transform: uppercase; }}
@@ -150,10 +142,11 @@ async def executer_veille():
     <div class="alert-section">
         <div class="alert-line">⚠️ RTBA R147 : {notams['R147']}</div>
         <div class="alert-line" style="color:#4dabff;">⚠️ RTBA R45A : {notams['R45A']}</div>
+        <div class="alert-line" style="margin-top:10px; border-top: 1px solid rgba(255,204,0,0.2); padding-top:10px;">📋 {partie_fr.split('|')[0]}</div>
     </div>
     <audio controls><source src="atis.mp3?v={ts}" type="audio/mpeg"></audio>
     <button class="btn-refresh" onclick="window.location.reload()">🔄 ACTUALISER LES DONNÉES</button>
-    <div class="disclaimer"><b>ATTENTION :</b> Ce système est une aide à l'information automatisée utilisant des sources METAR et NOTAM tierces. Ces données ne remplacent pas les publications officielles du SIA. Vérifiez toujours l'AZBA et les NOTAMs avant le vol.</div>
+    <div class="disclaimer"><b>DISCLAIMER :</b> Données issues de sources METAR/NOTAM automatisées. Utilisation à titre informatif uniquement. Vérifiez les sources officielles du SIA (NOTAM & AZBA) avant tout vol.</div>
     </div></body></html>"""
 
     with open("index.html", "w", encoding="utf-8") as f: f.write(html_content)
