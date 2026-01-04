@@ -73,37 +73,31 @@ def obtenir_donnees_moyennes():
     }
 
 def scanner_notams():
+    # FIRs : Brest, Paris, Reims, Marseille
     firs = ["LFRR", "LFFF", "LFEE", "LFMM"]
-    # À la place de status = {"R147": "...", "R45A": "..."}
-status = {"R147": f"DEBUG: {len(combined_text)} car.", "R45A": "En attente"}
-    
-    combined_text = ""
+    status = {"R147": "pas d'information", "R45A": "pas d'information"}
     
     for fir in firs:
         try:
-            url = f"https://api.allorigins.win/get?url=" + requests.utils.quote(f"https://www.notams.faa.gov/common/icao/{fir}.html")
+            # Appel à l'API de données NOTAM (via proxy pour éviter CORS/Blocages)
+            url = f"https://api.allorigins.win/get?url=" + requests.utils.quote(f"https://notams.aim.faa.gov/notamSearch/search?searchType=0&designators={fir}&sortOrder=0")
             res = requests.get(url, timeout=15)
             if res.status_code == 200:
-                # Nettoyage ultra-agressif
-                clean = re.sub(r'<[^>]+>', ' ', res.text.upper())
-                combined_text += " ".join(clean.split()) + " #END# "
-        except: continue
+                text_data = res.text.upper()
+                for zone in ["R147", "R45A"]:
+                    # Si on a déjà trouvé l'info pour une zone, on ne l'écrase pas avec un "pas d'info" d'un autre FIR
+                    if status[zone] != "pas d'information": continue
 
-    if not combined_text: return status
-
-    for zone in ["R147", "R45A"]:
-        # PLAN C : On cherche la zone et on prend TOUT jusqu'à la prochaine zone ou la fin du NOTAM
-        # Puis on cherche un horaire dans ce petit morceau uniquement
-        bloc_match = re.search(rf"{zone}(.*?)(?=ZONE|R\d{{2,3}}|[A-Z]\) |#END#)", combined_text)
-        if bloc_match:
-            contenu_bloc = bloc_match.group(1)
-            # On cherche 4 chiffres, tiret, 4 chiffres (ex: 1430-1600)
-            time_match = re.search(r"(\d{4})[-/](\d{4})", contenu_bloc)
-            if time_match:
-                start, end = time_match.group(1), time_match.group(2)
-                status[zone] = f"active de {start[:2]}:{start[2:]} à {end[:2]}:{end[2:]}"
-            else:
-                status[zone] = "citée (vérifier SIA)"
+                    # Recherche du bloc spécifique à la zone dans le texte brut
+                    # Format SIA : ZONE R45A ... 1430-1600:ACTIVE
+                    match = re.search(rf"{zone}.*?(\d{{4}}[-/]\d{{4}})", text_data)
+                    if match:
+                        t = match.group(1).replace('/', '-')
+                        status[zone] = f"active de {t[:2]}:{t[2:4]} à {t[-4:-2]}:{t[-2:]}"
+                    elif zone in text_data:
+                        status[zone] = "citée (vérifier SIA)"
+        except:
+            continue
             
     return status
 
@@ -113,8 +107,8 @@ async def generer_audio(vocal_fr, vocal_en):
     with open("atis.mp3", "wb") as f:
         for fname in ["fr.mp3", "en.mp3"]:
             with open(fname, "rb") as fd: f.write(fd.read())
-    for f in ["fr.mp3", "en.mp3"]:
-        if os.path.exists(f): os.remove(f)
+    if os.path.exists("fr.mp3"): os.remove("fr.mp3")
+    if os.path.exists("en.mp3"): os.remove("en.mp3")
 
 async def executer_veille():
     m = obtenir_donnees_moyennes()
@@ -123,9 +117,8 @@ async def executer_veille():
 
     remarques_raw = os.getenv("ATIS_REMARQUES", "Prudence R45A demain :: Caution R45A tomorrow")
     partie_fr, partie_en = remarques_raw.split("::") if "::" in remarques_raw else (remarques_raw, "Caution")
-    liste_fr = [r.strip() for r in partie_fr.split("|")]
     
-    html_remarques = "".join([f'<div class="alert-line">⚠️ {r}</div>' for r in liste_fr])
+    html_remarques = "".join([f'<div class="alert-line">⚠️ {r.strip()}</div>' for r in partie_fr.split("|")])
 
     notam_txt_fr = f"Zone R 147 : {notams['R147']}."
     if "active" in notams['R45A']: notam_txt_fr += f" Notez zone R 45 alpha {notams['R45A']}."
@@ -142,9 +135,6 @@ async def executer_veille():
     html_content = f"""<!DOCTYPE html><html lang="fr"><head><meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>ATIS LF8523</title>
-    <link rel="manifest" href="manifest.json?v=2">
-    <link rel="apple-touch-icon" href="icon.png?v=2">
-    <link rel="icon" type="image/png" href="icon.png?v=2">
     <style>
         body {{ font-family: sans-serif; text-align: center; padding: 20px; background: #121212; color: #e0e0e0; min-height: 100vh; display: flex; align-items: center; justify-content: center; margin: 0; }}
         .card {{ background: #1e1e1e; padding: 25px; border-radius: 15px; max-width: 500px; width: 90%; border: 1px solid #333; box-shadow: 0 10px 30px rgba(0,0,0,0.5); }}
@@ -158,7 +148,6 @@ async def executer_veille():
         .alert-line {{ color: #ffcc00; font-weight: bold; font-size: 0.9em; margin-bottom: 8px; }}
         audio {{ width: 100%; filter: invert(90%); margin-top: 10px; }}
         .btn-refresh {{ background: #333; color: #ccc; border: 1px solid #444; padding: 12px 20px; border-radius: 8px; cursor: pointer; margin-top: 20px; font-size: 0.9em; transition: 0.3s; font-weight: bold; width: 100%; }}
-        .disclaimer {{ font-size: 0.7em; color: #ccc; margin-top: 30px; line-height: 1.4; font-style: italic; border-top: 1px solid #333; padding-top: 15px; text-align: justify; }}
     </style></head><body><div class="card">
     <h1>ATIS LF8523</h1><div class="subtitle">Atlantic Air Park</div>
     <div class="data-grid">
