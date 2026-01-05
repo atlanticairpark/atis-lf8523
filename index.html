@@ -3,27 +3,33 @@
     <title>ATIS LF8523</title>
     <style>
         body { font-family: sans-serif; text-align: center; padding: 20px; background: #121212; color: #e0e0e0; }
-        .card { background: #1e1e1e; padding: 25px; border-radius: 15px; max-width: 500px; margin: auto; border: 1px solid #333; }
-        h1 { color: #fff; } .subtitle { color: #4dabff; font-weight: bold; margin-bottom: 25px; }
+        .card { background: #1e1e1e; padding: 25px; border-radius: 15px; max-width: 500px; margin: auto; border: 1px solid #333; box-shadow: 0 10px 30px rgba(0,0,0,0.5); }
+        h1 { color: #fff; margin-bottom: 5px; }
+        .subtitle { color: #4dabff; font-weight: bold; margin-bottom: 25px; text-transform: uppercase; font-size: 0.9em; }
         .data-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 25px; }
         .data-item { background: #2a2a2a; padding: 15px; border-radius: 10px; border: 1px solid #3d3d3d; }
         .label { font-size: 0.75em; color: #888; text-transform: uppercase; }
         .value { font-size: 1.2em; font-weight: bold; color: #fff; }
         .alert-section { text-align: left; background: rgba(255, 204, 0, 0.1); border-left: 4px solid #ffcc00; padding: 15px; margin-bottom: 25px; }
         .alert-line { color: #ffcc00; font-weight: bold; font-size: 0.9em; margin-bottom: 8px; }
-        audio { width: 100%; filter: invert(90%); }
+        audio { width: 100%; filter: invert(90%); margin-bottom: 20px; }
+        .btn-refresh { background: #333; color: #ccc; border: 1px solid #444; padding: 12px 20px; border-radius: 8px; cursor: pointer; width: 100%; font-weight: bold; transition: 0.3s; }
+        .btn-refresh:hover { background: #444; color: #fff; }
+        .disclaimer { font-size: 0.7em; color: #666; margin-top: 30px; line-height: 1.4; text-align: justify; border-top: 1px solid #333; padding-top: 15px; }
     </style></head><body><div class="card">
     <h1>ATIS LF8523</h1><div class="subtitle">Atlantic Air Park</div>
     <div class="data-grid">
-        <div class="data-item"><div class="label">Heure (UTC)</div><div class="value">⌚ 23:30Z</div></div>
-        <div class="data-item"><div class="label">Vent</div><div class="value">🌬 140/2kt</div></div>
-        <div class="data-item"><div class="label">Temp / Rosée</div><div class="value">🌡 -2° / -4°</div></div>
+        <div class="data-item"><div class="label">Heure (UTC)</div><div class="value">⌚ 02:30Z</div></div>
+        <div class="data-item"><div class="label">Vent</div><div class="value">🌬 160/4kt</div></div>
+        <div class="data-item"><div class="label">Temp / Rosée</div><div class="value">🌡 -5° / -6°</div></div>
         <div class="data-item"><div class="label">QNH</div><div class="value">💎 1016 hPa</div></div>
     </div>
     <div class="alert-section">
         <div class="alert-line">⚠️ RTBA R147 : pas d'information</div>
         <div class="alert-line" style="color:#4dabff;">⚠️ RTBA R45A : pas d'information</div>
+        <div class="alert-line" style="margin-top:10px; border-top: 1px solid rgba(255,204,0,0.2); padding-top:10px;">📋 Attention </div>
     </div>
-    <audio controls><source src="atis.mp3?v=1767570482" type="audio/mpeg"></audio>
-    <div style="font-size:0.7em; color:#444; margin-top:15px;">Scan OK (0 car.)</div>
+    <audio controls><source src="atis.mp3?v=1767580657" type="audio/mpeg"></audio>
+    <button class="btn-refresh" onclick="window.location.reload()">🔄 ACTUALISER LES DONNÉES</button>
+    <div class="disclaimer"><b>DISCLAIMER :</b> Données issues de sources METAR/NOTAM automatisées. Utilisation à titre informatif uniquement. Vérifiez les sources officielles du SIA (NOTAM & AZBA) avant tout vol.</div>
     </div></body></html>
