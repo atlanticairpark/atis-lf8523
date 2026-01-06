@@ -280,7 +280,7 @@ async def executer_veille():
     <link rel="apple-touch-icon" href="icon.png?v=2">
     <link rel="icon" type="image/png" href="icon.png?v=2">
     <style>
-        * { box-sizing: border-box; }
+        * {{ box-sizing: border-box; }}
         body {{ 
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
             text-align: center; 
