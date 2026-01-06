@@ -179,24 +179,28 @@ def scanner_notams():
                 match = re.search(r'R\s*147.*?C(\d{10})/(\d{10})', texte, re.DOTALL)
                 if match:
                     debut, fin = match.group(1), match.group(2)
+                    jour, mois = debut[4:6], debut[2:4]
                     h_debut = f"{debut[6:8]}:{debut[8:10]}"
                     h_fin = f"{fin[6:8]}:{fin[8:10]}"
-                    status["R147"] = f"active {h_debut}-{h_fin}Z"
+                    status["R147"]["date"] = f"{jour}/{mois}"
+                    status["R147"]["info"] = f"active {h_debut}-{h_fin}Z"
                 elif 'R147' in texte:
-                    status["R147"] = "active (voir NOTAM)"
+                    status["R147"]["info"] = "active (voir NOTAM)"
             
             # R45A
             if any(x in texte for x in ['R45A', 'R 45A', 'R45 A']):
                 match = re.search(r'R\s*45\s*A.*?C(\d{10})/(\d{10})', texte, re.DOTALL)
                 if match:
                     debut, fin = match.group(1), match.group(2)
+                    jour, mois = debut[4:6], debut[2:4]
                     h_debut = f"{debut[6:8]}:{debut[8:10]}"
                     h_fin = f"{fin[6:8]}:{fin[8:10]}"
-                    status["R45A"] = f"active {h_debut}-{h_fin}Z"
+                    status["R45A"]["date"] = f"{jour}/{mois}"
+                    status["R45A"]["info"] = f"active {h_debut}-{h_fin}Z"
                 elif any(x in texte for x in ['R45A', 'R 45A']):
-                    status["R45A"] = "active (voir NOTAM)"
+                    status["R45A"]["info"] = "active (voir NOTAM)"
             
-            if status["R147"] != "pas d'information" or status["R45A"] != "pas d'information":
+            if status["R147"]["info"] != "pas d'information" or status["R45A"]["info"] != "pas d'information":
                 return status
     except:
         pass
@@ -216,7 +220,7 @@ def scanner_notams():
                     match = re.search(f"{pattern}.*?(\\d{{4}}).*?TO.*?(\\d{{4}})", texte)
                     if match:
                         h1, h2 = match.group(1), match.group(2)
-                        status[zone] = f"active {h1[:2]}h{h1[2:]}-{h2[:2]}h{h2[2:]}Z"
+                        status[zone]["info"] = f"active {h1[:2]}h{h1[2:]}-{h2[:2]}h{h2[2:]}Z"
     except:
         pass
     
@@ -232,9 +236,15 @@ async def generer_audio(vocal_fr, vocal_en):
         if os.path.exists(f): os.remove(f)
 
 async def executer_veille():
+    from datetime import datetime
     m = obtenir_donnees_moyennes()
     notams = scanner_notams()
     if not m: return
+    
+    # Date et heure de génération
+    maintenant = datetime.now()
+    date_generation = maintenant.strftime("%d/%m/%Y à %H:%M")
+    date_generation_courte = maintenant.strftime("%d/%m %H:%M")
 
     remarques_raw = os.getenv("ATIS_REMARQUES", "Piste en herbe 08/26 fermée cause travaux | Prudence :: Grass runway 08/26 closed due to works | Caution")
     partie_fr, partie_en = remarques_raw.split("::") if "::" in remarques_raw else (remarques_raw, "Caution")
@@ -247,8 +257,9 @@ async def executer_veille():
     audio_remarques_en = ". ".join(liste_en) + "."
 
     # AUDIO FR
-    notam_audio_fr = f"Zone R 147 : {notams['R147']}."
-    if "active" in notams['R45A']: notam_audio_fr += f" Notez également zone R 45 alpha {notams['R45A']}."
+    notam_audio_fr = f"Zone R 147 : {notams['R147']['info']}."
+    if "active" in notams['R45A']['info']: 
+        notam_audio_fr += f" Notez également zone R 45 alpha {notams['R45A']['info']}."
 
     txt_fr = (f"Atlantic Air Park, observation de {m['heure_metar'].replace(':',' heures ')} UTC. "
               f"{m['w_audio_fr']}. Température {m['t_audio_fr']} degrés. Point de rosée {m['d_audio_fr']} degrés. "
@@ -269,19 +280,154 @@ async def executer_veille():
     <link rel="apple-touch-icon" href="icon.png?v=2">
     <link rel="icon" type="image/png" href="icon.png?v=2">
     <style>
-        body {{ font-family: sans-serif; text-align: center; padding: 20px; background: #121212; color: #e0e0e0; min-height: 100vh; display: flex; align-items: center; justify-content: center; margin: 0; }}
-        .card {{ background: #1e1e1e; padding: 25px; border-radius: 15px; max-width: 500px; width: 90%; border: 1px solid #333; box-shadow: 0 10px 30px rgba(0,0,0,0.5); }}
-        h1 {{ color: #fff; margin: 0 0 5px 0; font-size: 1.8em; }} 
-        .subtitle {{ color: #4dabff; font-weight: bold; margin-bottom: 25px; text-transform: uppercase; letter-spacing: 1px; font-size: 0.9em; }}
-        .data-grid {{ display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 25px; }}
-        .data-item {{ background: #2a2a2a; padding: 15px; border-radius: 10px; border: 1px solid #3d3d3d; }}
-        .label {{ font-size: 0.75em; color: #888; text-transform: uppercase; }}
-        .value {{ font-size: 1.2em; font-weight: bold; color: #fff; margin-top:5px; }}
-        .alert-section {{ text-align: left; background: rgba(255, 204, 0, 0.1); border-left: 4px solid #ffcc00; padding: 15px; margin-bottom: 25px; }}
-        .alert-line {{ color: #ffcc00; font-weight: bold; font-size: 0.9em; margin-bottom: 8px; }}
-        audio {{ width: 100%; filter: invert(90%); margin-top: 10px; }}
-        .btn-refresh {{ background: #333; color: #ccc; border: 1px solid #444; padding: 12px 20px; border-radius: 8px; cursor: pointer; margin-top: 20px; font-size: 0.9em; transition: 0.3s; font-weight: bold; width: 100%; }}
-        .disclaimer {{ font-size: 0.7em; color: #ccc; margin-top: 30px; line-height: 1.4; font-style: italic; border-top: 1px solid #333; padding-top: 15px; text-align: justify; }}
+        * { box-sizing: border-box; }
+        body {{ 
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            text-align: center; 
+            padding: 20px; 
+            background: linear-gradient(135deg, #0f2027 0%, #203a43 50%, #2c5364 100%);
+            color: #e0e0e0; 
+            min-height: 100vh; 
+            display: flex; 
+            align-items: center; 
+            justify-content: center; 
+            margin: 0; 
+        }}
+        .card {{ 
+            background: rgba(30, 30, 30, 0.95); 
+            padding: 30px; 
+            border-radius: 20px; 
+            max-width: 550px; 
+            width: 90%; 
+            border: 1px solid rgba(77, 171, 255, 0.3); 
+            box-shadow: 0 20px 60px rgba(0,0,0,0.6), 0 0 40px rgba(77, 171, 255, 0.1); 
+            backdrop-filter: blur(10px);
+        }}
+        h1 {{ 
+            color: #fff; 
+            margin: 0 0 8px 0; 
+            font-size: 2em; 
+            font-weight: 700;
+            text-shadow: 0 2px 10px rgba(77, 171, 255, 0.5);
+        }} 
+        .subtitle {{ 
+            color: #4dabff; 
+            font-weight: 600; 
+            margin-bottom: 30px; 
+            text-transform: uppercase; 
+            letter-spacing: 2px; 
+            font-size: 0.85em; 
+        }}
+        .data-grid {{ 
+            display: grid; 
+            grid-template-columns: 1fr 1fr; 
+            gap: 15px; 
+            margin-bottom: 25px; 
+        }}
+        .data-item {{ 
+            background: linear-gradient(135deg, rgba(42, 42, 42, 0.8) 0%, rgba(35, 35, 35, 0.9) 100%); 
+            padding: 18px; 
+            border-radius: 12px; 
+            border: 1px solid rgba(77, 171, 255, 0.2); 
+            transition: all 0.3s ease;
+        }}
+        .data-item:hover {{
+            transform: translateY(-2px);
+            border-color: rgba(77, 171, 255, 0.5);
+            box-shadow: 0 5px 15px rgba(77, 171, 255, 0.2);
+        }}
+        .label {{ 
+            font-size: 0.7em; 
+            color: #999; 
+            text-transform: uppercase; 
+            letter-spacing: 1px;
+            font-weight: 600;
+        }}
+        .value {{ 
+            font-size: 1.3em; 
+            font-weight: 700; 
+            color: #fff; 
+            margin-top: 8px; 
+        }}
+        .alert-section {{ 
+            text-align: left; 
+            background: linear-gradient(135deg, rgba(255, 152, 0, 0.15) 0%, rgba(255, 193, 7, 0.1) 100%); 
+            border-left: 4px solid #ff9800; 
+            padding: 18px; 
+            margin-bottom: 25px; 
+            border-radius: 8px;
+        }}
+        .alert-line {{ 
+            color: #ffb74d; 
+            font-weight: 600; 
+            font-size: 0.9em; 
+            margin-bottom: 10px; 
+            display: flex;
+            align-items: center;
+        }}
+        .alert-line:last-child {{ margin-bottom: 0; }}
+        .zone-date {{
+            display: inline-block;
+            background: rgba(77, 171, 255, 0.2);
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-size: 0.85em;
+            margin-left: 8px;
+            color: #4dabff;
+            font-weight: 500;
+        }}
+        audio {{ 
+            width: 100%; 
+            filter: invert(90%) hue-rotate(180deg); 
+            margin-top: 10px; 
+            border-radius: 8px;
+        }}
+        .btn-refresh {{ 
+            background: linear-gradient(135deg, #4dabff 0%, #3d8fd1 100%); 
+            color: white; 
+            border: none; 
+            padding: 14px 24px; 
+            border-radius: 10px; 
+            cursor: pointer; 
+            margin-top: 20px; 
+            font-size: 0.95em; 
+            transition: all 0.3s ease; 
+            font-weight: 700; 
+            width: 100%; 
+            box-shadow: 0 4px 15px rgba(77, 171, 255, 0.3);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }}
+        .btn-refresh:hover {{
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(77, 171, 255, 0.4);
+        }}
+        .btn-refresh:active {{
+            transform: translateY(0);
+        }}
+        .update-info {{
+            font-size: 0.75em;
+            color: #999;
+            margin-top: 8px;
+            font-style: italic;
+        }}
+        .disclaimer {{ 
+            font-size: 0.7em; 
+            color: #aaa; 
+            margin-top: 30px; 
+            line-height: 1.6; 
+            border-top: 1px solid rgba(255,255,255,0.1); 
+            padding-top: 20px; 
+            text-align: left;
+            background: rgba(255, 152, 0, 0.05);
+            padding: 15px;
+            border-radius: 8px;
+            border-left: 3px solid #ff9800;
+        }}
+        .disclaimer strong {{
+            color: #ffb74d;
+            font-weight: 700;
+        }}
     </style></head><body><div class="card">
     <h1>ATIS LF8523</h1><div class="subtitle">Atlantic Air Park</div>
     <div class="data-grid">
@@ -292,12 +438,24 @@ async def executer_veille():
     </div>
     <div class="alert-section">
         {html_remarques}
-        <div class="alert-line">⚠️ RTBA R147 : {notams['R147']}</div>
-        <div class="alert-line" style="color:#4dabff; font-size: 0.85em;">🔹 RTBA R45A : {notams['R45A']}</div>
+        <div class="alert-line">
+            ⚠️ RTBA R147 : {notams['R147']['info']}
+            {f'<span class="zone-date">📅 {notams["R147"]["date"]}</span>' if notams['R147']['date'] else ''}
+        </div>
+        <div class="alert-line" style="color:#4dabff;">
+            🔹 RTBA R45A : {notams['R45A']['info']}
+            {f'<span class="zone-date">📅 {notams["R45A"]["date"]}</span>' if notams['R45A']['date'] else ''}
+        </div>
     </div>
     <audio controls><source src="atis.mp3?v={ts}" type="audio/mpeg"></audio>
-    <button class="btn-refresh" onclick="window.location.reload()">🔄 Actualiser les données</button>
-    <div class="disclaimer">Valeurs issues des moyennes LFBH/LFRI. Seule la doc officielle fait foi.</div>
+    <button class="btn-refresh" onclick="window.location.reload()">🔄 Actualiser</button>
+    <div class="update-info">Dernière mise à jour : {date_generation_courte}</div>
+    <div class="disclaimer">
+        <strong>⚠️ Avertissement :</strong> Les informations affichées sont indicatives et calculées à partir de sources publiques (moyennes LFBH/LFRI). 
+        <strong>Atlantic Air Park ne garantit pas l'exactitude de ces données.</strong> 
+        Seules les informations officielles publiées par les autorités aéronautiques compétentes (SIA, Météo France, etc.) font foi. 
+        Il est impératif de consulter les sources officielles avant tout vol.
+    </div>
     </div></body></html>"""
 
     with open("index.html", "w", encoding="utf-8") as f: f.write(html_content)
