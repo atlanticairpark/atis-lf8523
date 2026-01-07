@@ -438,13 +438,14 @@ async def executer_veille():
     </div>
     <div class="alert-section">
         {html_remarques}
-        <div class="alert-line">
-            ⚠️ RTBA R147 : {notams['R147']['info']}
-            {f'<span class="zone-date">📅 {notams["R147"]["date"]}</span>' if notams['R147']['date'] else ''}
+        <div class="alert-line" style="font-size: 1em; color: #ffb74d;">
+            🚨 RTBA R147 (CHARENTE) : {notams['R147']['info']}
+            {('<span class="zone-date">📅 ' + notams["R147"]["date"] + '</span>') if notams['R147']['date'] else ''}
         </div>
-        <div class="alert-line" style="color:#4dabff;">
-            🔹 RTBA R45A : {notams['R45A']['info']}
-            {f'<span class="zone-date">📅 {notams["R45A"]["date"]}</span>' if notams['R45A']['date'] else ''}
+        <!-- Ligne R45A - À SUPPRIMER quand le script sera validé -->
+        <div class="alert-line" style="color:#666; font-size: 0.8em; opacity: 0.6; margin-top: 12px; border-top: 1px solid rgba(255,255,255,0.1); padding-top: 10px;">
+            🔹 R45A (test - Bourgogne) : {notams['R45A']['info']}
+            {('<span class="zone-date">📅 ' + notams["R45A"]["date"] + '</span>') if notams['R45A']['date'] else ''}
         </div>
     </div>
     <audio controls><source src="atis.mp3?v={ts}" type="audio/mpeg"></audio>
