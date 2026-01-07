@@ -97,13 +97,12 @@ def obtenir_donnees_moyennes():
 
 def scanner_notams():
     """
-    Scanner NOTAM amélioré avec sources multiples
-    Retourne dict avec 'status' et 'date' pour chaque zone
+    Scanner NOTAM amélioré - R147 uniquement
+    Retourne dict avec 'status' et 'date' pour la zone
     """
     from datetime import datetime
     status = {
-        "R147": {"info": "pas d'information", "date": ""},
-        "R45A": {"info": "pas d'information", "date": ""}
+        "R147": {"info": "pas d'information", "date": ""}
     }
     
     # MÉTHODE 1 : Site AZBA du SIA (source officielle plannings)
@@ -119,15 +118,7 @@ def scanner_notams():
             texte = res.text
             
             # Pattern plus large pour capturer date + horaires
-            # Ex: "06/01/2026" suivi de "R45A" suivi de "0900-1100"
-            
-            # R45A avec date
-            match_r45a = re.search(r'(\d{2})/(\d{2})/(\d{4}).*?R\s*45\s*A.*?(\d{2}):?(\d{2})[^\d]*(\d{2}):?(\d{2})', texte, re.IGNORECASE | re.DOTALL)
-            if match_r45a:
-                jour, mois = match_r45a.group(1), match_r45a.group(2)
-                h1, m1, h2, m2 = match_r45a.group(4), match_r45a.group(5), match_r45a.group(6), match_r45a.group(7)
-                status["R45A"]["date"] = f"{jour}/{mois}"
-                status["R45A"]["info"] = f"active {h1}h{m1}-{h2}h{m2}Z"
+            # Ex: "07/01/2026" suivi de "R147" suivi de "0930-1100"
             
             # R147 avec date
             match_r147 = re.search(r'(\d{2})/(\d{2})/(\d{4}).*?R\s*147.*?(\d{2}):?(\d{2})[^\d]*(\d{2}):?(\d{2})', texte, re.IGNORECASE | re.DOTALL)
@@ -137,8 +128,8 @@ def scanner_notams():
                 status["R147"]["date"] = f"{jour}/{mois}"
                 status["R147"]["info"] = f"active {h1}h{m1}-{h2}h{m2}Z"
             
-            # Si au moins une zone trouvée, on retourne
-            if status["R147"]["info"] != "pas d'information" or status["R45A"]["info"] != "pas d'information":
+            # Si zone trouvée, on retourne
+            if status["R147"]["info"] != "pas d'information":
                 return status
                 
     except Exception as e:
@@ -153,8 +144,8 @@ def scanner_notams():
         if res.status_code == 200:
             texte = res.text.upper()
             
-            # R147 - Pattern NOTAM avec dates
-            if 'R147' in texte or 'R 147' in texte:
+            # R147
+            if any(x in texte for x in ['R147', 'R 147']):
                 match = re.search(r'R\s*147.*?C(\d{10})/(\d{10})', texte, re.DOTALL)
                 if match:
                     debut, fin = match.group(1), match.group(2)
@@ -166,20 +157,7 @@ def scanner_notams():
                 elif 'R147' in texte:
                     status["R147"]["info"] = "active (voir NOTAM)"
             
-            # R45A
-            if any(x in texte for x in ['R45A', 'R 45A', 'R45 A']):
-                match = re.search(r'R\s*45\s*A.*?C(\d{10})/(\d{10})', texte, re.DOTALL)
-                if match:
-                    debut, fin = match.group(1), match.group(2)
-                    jour, mois = debut[4:6], debut[2:4]
-                    h_debut = f"{debut[6:8]}:{debut[8:10]}"
-                    h_fin = f"{fin[6:8]}:{fin[8:10]}"
-                    status["R45A"]["date"] = f"{jour}/{mois}"
-                    status["R45A"]["info"] = f"active {h_debut}-{h_fin}Z"
-                elif any(x in texte for x in ['R45A', 'R 45A']):
-                    status["R45A"]["info"] = "active (voir NOTAM)"
-            
-            if status["R147"]["info"] != "pas d'information" or status["R45A"]["info"] != "pas d'information":
+            if status["R147"]["info"] != "pas d'information":
                 return status
     except:
         pass
@@ -194,12 +172,10 @@ def scanner_notams():
             texte = data.get('contents', '').upper()
             
             if texte:
-                for zone in ["R147", "R45A"]:
-                    pattern = zone.replace('A', r'\s*A')
-                    match = re.search(f"{pattern}.*?(\\d{{4}}).*?TO.*?(\\d{{4}})", texte)
-                    if match:
-                        h1, h2 = match.group(1), match.group(2)
-                        status[zone]["info"] = f"active {h1[:2]}h{h1[2:]}-{h2[:2]}h{h2[2:]}Z"
+                match = re.search(r"R147.*?(\\d{{4}}).*?TO.*?(\\d{{4}})", texte)
+                if match:
+                    h1, h2 = match.group(1), match.group(2)
+                    status["R147"]["info"] = f"active {h1[:2]}h{h1[2:]}-{h2[:2]}h{h2[2:]}Z"
     except:
         pass
     
@@ -235,10 +211,25 @@ async def executer_veille():
     audio_remarques_fr = ". ".join(liste_fr) + "."
     audio_remarques_en = ". ".join(liste_en) + "."
 
-    # AUDIO FR
-    notam_audio_fr = f"Zone R 147 : {notams['R147']['info']}."
-    if "active" in notams['R45A']['info']: 
-        notam_audio_fr += f" Notez également zone R 45 alpha {notams['R45A']['info']}."
+    # AUDIO FR - Conversion horaires pour lecture naturelle
+    notam_info_fr = notams['R147']['info']
+    notam_date_fr = notams['R147']['date']
+    
+    # Extraction et conversion des horaires pour l'audio français
+    if "active" in notam_info_fr and notam_date_fr:
+        # Pattern: "active 09h30-11h00Z" → "active le 07/01 de 9 heures 30 à 11 heures UTC"
+        match_horaire = re.search(r'active (\d{2})h(\d{2})-(\d{2})h(\d{2})Z', notam_info_fr)
+        if match_horaire:
+            h1, m1, h2, m2 = match_horaire.groups()
+            h1_audio = int(h1)
+            m1_audio = f" {int(m1)}" if int(m1) > 0 else ""
+            h2_audio = int(h2)
+            m2_audio = f" {int(m2)}" if int(m2) > 0 else ""
+            notam_audio_fr = f"Zone R 147 : active le {notam_date_fr} de {h1_audio} heures{m1_audio} à {h2_audio} heures{m2_audio} UTC."
+        else:
+            notam_audio_fr = f"Zone R 147 : {notam_info_fr}."
+    else:
+        notam_audio_fr = f"Zone R 147 : {notam_info_fr}."
 
     txt_fr = (f"Atlantic Air Park, observation de {m['heure_metar'].replace(':',' heures ')} UTC. "
               f"{m['w_audio_fr']}. Température {m['t_audio_fr']} degrés. Point de rosée {m['d_audio_fr']} degrés. "
@@ -247,7 +238,7 @@ async def executer_veille():
     # AUDIO EN
     txt_en = (f"Atlantic Air Park observation at {m['heure_metar'].replace(':',' ')} UTC. "
               f"{m['w_audio_en']}. Temperature {m['t_audio_en']} degrees. Dew point {m['d_audio_en']} degrees. "
-              f"Q N H {m['q_audio_en']} hectopascals. {audio_remarques_en} Check NOTAM for military areas.")
+              f"Q N H {m['q_audio_en']} hectopascals. {audio_remarques_en}")
 
     await generer_audio(txt_fr, txt_en)
     ts = int(time.time())
@@ -298,17 +289,18 @@ async def executer_veille():
             margin-bottom: 25px; 
         }}
         .data-item {{ 
-            background: rgba(255, 255, 255, 0.15); 
+            background: rgba(20, 60, 90, 0.6); 
             padding: 18px; 
             border-radius: 12px; 
-            border: 1px solid rgba(255, 255, 255, 0.25); 
+            border: 1px solid rgba(100, 180, 220, 0.3); 
             transition: all 0.3s ease;
             backdrop-filter: blur(5px);
         }}
         .data-item:hover {{
+            background: rgba(20, 60, 90, 0.75);
             transform: translateY(-2px);
-            border-color: rgba(255, 255, 255, 0.4);
-            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
+            border-color: rgba(100, 180, 220, 0.5);
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
         }}
         .label {{ 
             font-size: 0.7em; 
@@ -325,7 +317,7 @@ async def executer_veille():
         }}
         .alert-section {{ 
             text-align: left; 
-            background: rgba(255, 255, 255, 0.12); 
+            background: rgba(20, 60, 90, 0.5); 
             border-left: 4px solid #ff9800; 
             padding: 18px; 
             margin-bottom: 25px; 
@@ -353,11 +345,11 @@ async def executer_veille():
             border: 1px solid rgba(255, 183, 77, 0.4);
         }}
         .audio-container {{
-            background: rgba(255, 255, 255, 0.15);
+            background: rgba(20, 60, 90, 0.6);
             padding: 15px;
             border-radius: 12px;
             margin: 20px 0;
-            border: 2px solid rgba(255, 255, 255, 0.3);
+            border: 2px solid rgba(100, 180, 220, 0.4);
             backdrop-filter: blur(5px);
         }}
         .audio-label {{
@@ -376,9 +368,9 @@ async def executer_veille():
             height: 40px;
         }}
         .btn-refresh {{ 
-            background: rgba(255, 255, 255, 0.25); 
+            background: rgba(20, 60, 90, 0.7); 
             color: white; 
-            border: 2px solid rgba(255, 255, 255, 0.4); 
+            border: 2px solid rgba(100, 180, 220, 0.5); 
             padding: 14px 24px; 
             border-radius: 10px; 
             cursor: pointer; 
@@ -392,7 +384,7 @@ async def executer_veille():
             backdrop-filter: blur(5px);
         }}
         .btn-refresh:hover {{
-            background: rgba(255, 255, 255, 0.35);
+            background: rgba(20, 60, 90, 0.85);
             transform: translateY(-2px);
             box-shadow: 0 6px 20px rgba(0, 0, 0, 0.3);
         }}
@@ -404,10 +396,10 @@ async def executer_veille():
             color: #fff;
             margin-top: 12px;
             font-weight: 600;
-            background: rgba(255, 255, 255, 0.15);
+            background: rgba(20, 60, 90, 0.5);
             padding: 8px 12px;
             border-radius: 8px;
-            border: 1px solid rgba(255, 255, 255, 0.25);
+            border: 1px solid rgba(100, 180, 220, 0.3);
             text-align: center;
         }}
         .disclaimer {{ 
@@ -418,7 +410,7 @@ async def executer_veille():
             border-top: 1px solid rgba(255,255,255,0.2); 
             padding-top: 20px; 
             text-align: left;
-            background: rgba(255, 152, 0, 0.12);
+            background: rgba(20, 60, 90, 0.4);
             padding: 15px;
             border-radius: 8px;
             border-left: 3px solid #ff9800;
@@ -440,11 +432,6 @@ async def executer_veille():
         <div class="alert-line" style="font-size: 1em; color: #ffb74d;">
             🚨 R147 CHARENTE : {notams['R147']['info']}
             {('<span class="zone-date">📅 ' + notams["R147"]["date"] + '</span>') if notams['R147']['date'] else ''}
-        </div>
-        <!-- Ligne R45A - À SUPPRIMER quand le script sera validé -->
-        <div class="alert-line" style="color:#666; font-size: 0.8em; opacity: 0.6; margin-top: 12px; border-top: 1px solid rgba(255,255,255,0.1); padding-top: 10px;">
-            🔹 R45A (test) : {notams['R45A']['info']}
-            {('<span class="zone-date">📅 ' + notams["R45A"]["date"] + '</span>') if notams['R45A']['date'] else ''}
         </div>
     </div>
     <div class="audio-container">
