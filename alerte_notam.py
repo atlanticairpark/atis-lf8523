@@ -118,9 +118,16 @@ def construire_message():
             elif date_notam.date() < maintenant.date():
                 # NOTAM périmé (date passée)
                 notam_valide_pour_demain = False
-        except:
+            else:
+                # Date dans le futur (après-demain, etc.) → ne pas alerter
+                notam_valide_pour_demain = False
+        except Exception as e:
+            print(f"Erreur validation date: {e}")
             # En cas d'erreur de parsing, on affiche quand même
             notam_valide_pour_demain = True
+    elif "active" in r147["info"].lower():
+        # Pas de date précise mais marqué actif → on alerte
+        notam_valide_pour_demain = True
     
     if "active" in r147["info"].lower() and notam_valide_pour_demain:
         # ALERTE : Zone active demain
