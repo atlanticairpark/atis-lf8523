@@ -295,10 +295,10 @@ async def executer_veille():
         }}
         .card {{ 
             background: rgba(30, 30, 30, 0.95); 
-            padding: 30px; 
+            padding: 30px 20px; 
             border-radius: 20px; 
-            max-width: 550px; 
-            width: 90%; 
+            max-width: 450px; 
+            width: 95%; 
             border: 1px solid rgba(77, 171, 255, 0.3); 
             box-shadow: 0 20px 60px rgba(0,0,0,0.6), 0 0 40px rgba(77, 171, 255, 0.1); 
             backdrop-filter: blur(10px);
@@ -368,19 +368,36 @@ async def executer_veille():
         .alert-line:last-child {{ margin-bottom: 0; }}
         .zone-date {{
             display: inline-block;
-            background: rgba(77, 171, 255, 0.2);
-            padding: 2px 8px;
-            border-radius: 4px;
-            font-size: 0.85em;
+            background: rgba(255, 183, 77, 0.25);
+            padding: 3px 10px;
+            border-radius: 6px;
+            font-size: 0.95em;
             margin-left: 8px;
+            color: #ffd54f;
+            font-weight: 700;
+            border: 1px solid rgba(255, 183, 77, 0.4);
+        }}
+        .audio-container {{
+            background: linear-gradient(135deg, rgba(77, 171, 255, 0.15) 0%, rgba(77, 171, 255, 0.25) 100%);
+            padding: 15px;
+            border-radius: 12px;
+            margin: 20px 0;
+            border: 2px solid rgba(77, 171, 255, 0.4);
+        }}
+        .audio-label {{
+            font-size: 0.85em;
             color: #4dabff;
-            font-weight: 500;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-bottom: 10px;
+            display: block;
         }}
         audio {{ 
             width: 100%; 
             filter: invert(90%) hue-rotate(180deg); 
-            margin-top: 10px; 
             border-radius: 8px;
+            height: 40px;
         }}
         .btn-refresh {{ 
             background: linear-gradient(135deg, #4dabff 0%, #3d8fd1 100%); 
@@ -406,10 +423,14 @@ async def executer_veille():
             transform: translateY(0);
         }}
         .update-info {{
-            font-size: 0.75em;
-            color: #999;
-            margin-top: 8px;
-            font-style: italic;
+            font-size: 0.9em;
+            color: #4dabff;
+            margin-top: 12px;
+            font-weight: 600;
+            background: rgba(77, 171, 255, 0.1);
+            padding: 8px 12px;
+            border-radius: 8px;
+            border: 1px solid rgba(77, 171, 255, 0.3);
         }}
         .disclaimer {{ 
             font-size: 0.7em; 
@@ -439,18 +460,21 @@ async def executer_veille():
     <div class="alert-section">
         {html_remarques}
         <div class="alert-line" style="font-size: 1em; color: #ffb74d;">
-            🚨 RTBA R147 (CHARENTE) : {notams['R147']['info']}
+            🚨 R147 CHARENTE : {notams['R147']['info']}
             {('<span class="zone-date">📅 ' + notams["R147"]["date"] + '</span>') if notams['R147']['date'] else ''}
         </div>
         <!-- Ligne R45A - À SUPPRIMER quand le script sera validé -->
         <div class="alert-line" style="color:#666; font-size: 0.8em; opacity: 0.6; margin-top: 12px; border-top: 1px solid rgba(255,255,255,0.1); padding-top: 10px;">
-            🔹 R45A (test - Bourgogne) : {notams['R45A']['info']}
+            🔹 R45A (test) : {notams['R45A']['info']}
             {('<span class="zone-date">📅 ' + notams["R45A"]["date"] + '</span>') if notams['R45A']['date'] else ''}
         </div>
     </div>
-    <audio controls><source src="atis.mp3?v={ts}" type="audio/mpeg"></audio>
+    <div class="audio-container">
+        <span class="audio-label">🔊 Écouter l'ATIS</span>
+        <audio controls><source src="atis.mp3?v={ts}" type="audio/mpeg"></audio>
+    </div>
     <button class="btn-refresh" onclick="window.location.reload()">🔄 Actualiser</button>
-    <div class="update-info">Dernière mise à jour : {date_generation_courte}</div>
+    <div class="update-info">🕐 Mise à jour : {date_generation_courte}</div>
     <div class="disclaimer">
         <strong>⚠️ Avertissement :</strong> Les informations affichées sont indicatives et calculées à partir de sources publiques (moyennes LFBH/LFRI). 
         <strong>Atlantic Air Park ne garantit pas l'exactitude de ces données.</strong> 
