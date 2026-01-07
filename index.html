@@ -44,17 +44,18 @@
             margin-bottom: 25px; 
         }
         .data-item { 
-            background: rgba(255, 255, 255, 0.15); 
+            background: rgba(20, 60, 90, 0.6); 
             padding: 18px; 
             border-radius: 12px; 
-            border: 1px solid rgba(255, 255, 255, 0.25); 
+            border: 1px solid rgba(100, 180, 220, 0.3); 
             transition: all 0.3s ease;
             backdrop-filter: blur(5px);
         }
         .data-item:hover {
+            background: rgba(20, 60, 90, 0.75);
             transform: translateY(-2px);
-            border-color: rgba(255, 255, 255, 0.4);
-            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
+            border-color: rgba(100, 180, 220, 0.5);
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
         }
         .label { 
             font-size: 0.7em; 
@@ -71,7 +72,7 @@
         }
         .alert-section { 
             text-align: left; 
-            background: rgba(255, 255, 255, 0.12); 
+            background: rgba(20, 60, 90, 0.5); 
             border-left: 4px solid #ff9800; 
             padding: 18px; 
             margin-bottom: 25px; 
@@ -99,11 +100,11 @@
             border: 1px solid rgba(255, 183, 77, 0.4);
         }
         .audio-container {
-            background: rgba(255, 255, 255, 0.15);
+            background: rgba(20, 60, 90, 0.6);
             padding: 15px;
             border-radius: 12px;
             margin: 20px 0;
-            border: 2px solid rgba(255, 255, 255, 0.3);
+            border: 2px solid rgba(100, 180, 220, 0.4);
             backdrop-filter: blur(5px);
         }
         .audio-label {
@@ -122,9 +123,9 @@
             height: 40px;
         }
         .btn-refresh { 
-            background: rgba(255, 255, 255, 0.25); 
+            background: rgba(20, 60, 90, 0.7); 
             color: white; 
-            border: 2px solid rgba(255, 255, 255, 0.4); 
+            border: 2px solid rgba(100, 180, 220, 0.5); 
             padding: 14px 24px; 
             border-radius: 10px; 
             cursor: pointer; 
@@ -138,7 +139,7 @@
             backdrop-filter: blur(5px);
         }
         .btn-refresh:hover {
-            background: rgba(255, 255, 255, 0.35);
+            background: rgba(20, 60, 90, 0.85);
             transform: translateY(-2px);
             box-shadow: 0 6px 20px rgba(0, 0, 0, 0.3);
         }
@@ -150,10 +151,10 @@
             color: #fff;
             margin-top: 12px;
             font-weight: 600;
-            background: rgba(255, 255, 255, 0.15);
+            background: rgba(20, 60, 90, 0.5);
             padding: 8px 12px;
             border-radius: 8px;
-            border: 1px solid rgba(255, 255, 255, 0.25);
+            border: 1px solid rgba(100, 180, 220, 0.3);
             text-align: center;
         }
         .disclaimer { 
@@ -164,7 +165,7 @@
             border-top: 1px solid rgba(255,255,255,0.2); 
             padding-top: 20px; 
             text-align: left;
-            background: rgba(255, 152, 0, 0.12);
+            background: rgba(20, 60, 90, 0.4);
             padding: 15px;
             border-radius: 8px;
             border-left: 3px solid #ff9800;
@@ -176,8 +177,8 @@
     </style></head><body><div class="container">
     <h1>ATIS LF8523</h1><div class="subtitle">Atlantic Air Park</div>
     <div class="data-grid">
-        <div class="data-item"><div class="label">Heure (UTC)</div><div class="value">⌚ 18:30Z</div></div>
-        <div class="data-item"><div class="label">Vent</div><div class="value">🌬 275 / 4kt</div></div>
+        <div class="data-item"><div class="label">Heure (UTC)</div><div class="value">⌚ 19:00Z</div></div>
+        <div class="data-item"><div class="label">Vent</div><div class="value">🌬 215 / 4kt</div></div>
         <div class="data-item"><div class="label">Temp / Rosée</div><div class="value">🌡 6° / 6°</div></div>
         <div class="data-item"><div class="label">QNH</div><div class="value">💎 1016 hPa</div></div>
     </div>
@@ -187,18 +188,13 @@
             🚨 R147 CHARENTE : active 09h30-11h00Z
             <span class="zone-date">📅 07/01</span>
         </div>
-        <!-- Ligne R45A - À SUPPRIMER quand le script sera validé -->
-        <div class="alert-line" style="color:#666; font-size: 0.8em; opacity: 0.6; margin-top: 12px; border-top: 1px solid rgba(255,255,255,0.1); padding-top: 10px;">
-            🔹 R45A (test) : active 09h00-11h00Z
-            <span class="zone-date">📅 07/01</span>
-        </div>
     </div>
     <div class="audio-container">
         <span class="audio-label">🔊 Écouter l'ATIS</span>
-        <audio controls><source src="atis.mp3?v=1767811731" type="audio/mpeg"></audio>
+        <audio controls><source src="atis.mp3?v=1767812895" type="audio/mpeg"></audio>
     </div>
     <button class="btn-refresh" onclick="window.location.reload()">🔄 Actualiser</button>
-    <div class="update-info">🕐 Mise à jour : 07/01 18:48</div>
+    <div class="update-info">🕐 Mise à jour : 07/01 19:08</div>
     <div class="disclaimer">
         <strong>⚠️ Avertissement :</strong> Les informations affichées sont indicatives et calculées à partir de sources publiques (moyennes LFBH/LFRI). 
         <strong>Atlantic Air Park ne garantit pas l'exactitude de ces données.</strong> 
