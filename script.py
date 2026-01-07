@@ -217,16 +217,23 @@ async def executer_veille():
                 minute_fin = int(match_heure_fin.group(2))
                 date_notam_fin = date_notam.replace(hour=heure_fin, minute=minute_fin)
                 
-                # Si la date/heure de fin est passée, ne pas afficher
-                if date_notam_fin > maintenant:
+                # Si c'est aujourd'hui et que l'heure de fin est passée → cacher
+                # Si c'est aujourd'hui ou dans le futur et pas encore terminé → afficher
+                if date_notam.date() == maintenant.date():
+                    # C'est aujourd'hui : vérifier l'heure de fin
+                    notam_r147_actif = date_notam_fin > maintenant
+                elif date_notam.date() > maintenant.date():
+                    # C'est dans le futur : toujours afficher
                     notam_r147_actif = True
             elif date_notam.date() >= maintenant.date():
-                # Pas d'heure précise mais date future/aujourd'hui
+                # Pas d'heure précise mais date aujourd'hui ou future
                 notam_r147_actif = True
-        except:
+        except Exception as e:
+            print(f"Erreur validation date NOTAM: {e}")
             # En cas d'erreur, on affiche quand même
             notam_r147_actif = "active" in notams['R147']['info'].lower()
     else:
+        # Pas de date/année → on affiche si marqué "active"
         notam_r147_actif = "active" in notams['R147']['info'].lower()
 
     remarques_raw = os.getenv("ATIS_REMARQUES", "Piste en herbe 08/26 fermée cause travaux | Prudence :: Grass runway 08/26 closed due to works | Caution")
