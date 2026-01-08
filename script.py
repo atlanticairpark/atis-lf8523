@@ -205,10 +205,13 @@ async def executer_veille():
     
     # Vérification si le NOTAM est périmé ou pour aujourd'hui/demain
     notam_r147_actif = False
+    print(f"DEBUG - Date NOTAM: {notams['R147']['date']}, Année: {notams['R147']['annee']}, Info: {notams['R147']['info']}")
+    
     if notams['R147']['date'] and notams['R147']['annee']:
         try:
             jour, mois = notams['R147']['date'].split("/")
             date_notam = datetime(int(notams['R147']['annee']), int(mois), int(jour))
+            print(f"DEBUG - Date NOTAM parsée: {date_notam.date()}, Aujourd'hui: {maintenant.date()}")
             
             # Extraire l'heure de fin du NOTAM
             match_heure_fin = re.search(r'-(\d{2})h(\d{2})Z', notams['R147']['info'])
@@ -216,25 +219,30 @@ async def executer_veille():
                 heure_fin = int(match_heure_fin.group(1))
                 minute_fin = int(match_heure_fin.group(2))
                 date_notam_fin = date_notam.replace(hour=heure_fin, minute=minute_fin)
+                print(f"DEBUG - Heure fin: {date_notam_fin}, Maintenant: {maintenant}")
                 
                 # Si c'est aujourd'hui et que l'heure de fin est passée → cacher
                 # Si c'est aujourd'hui ou dans le futur et pas encore terminé → afficher
                 if date_notam.date() == maintenant.date():
                     # C'est aujourd'hui : vérifier l'heure de fin
                     notam_r147_actif = date_notam_fin > maintenant
+                    print(f"DEBUG - Aujourd'hui, actif: {notam_r147_actif}")
                 elif date_notam.date() > maintenant.date():
                     # C'est dans le futur : toujours afficher
                     notam_r147_actif = True
+                    print(f"DEBUG - Futur, actif: True")
             elif date_notam.date() >= maintenant.date():
                 # Pas d'heure précise mais date aujourd'hui ou future
                 notam_r147_actif = True
+                print(f"DEBUG - Date >= aujourd'hui, actif: True")
         except Exception as e:
-            print(f"Erreur validation date NOTAM: {e}")
+            print(f"DEBUG - Erreur validation date NOTAM: {e}")
             # En cas d'erreur, on affiche quand même
             notam_r147_actif = "active" in notams['R147']['info'].lower()
     else:
         # Pas de date/année → on affiche si marqué "active"
         notam_r147_actif = "active" in notams['R147']['info'].lower()
+        print(f"DEBUG - Pas de date, actif selon info: {notam_r147_actif}")
 
     remarques_raw = os.getenv("ATIS_REMARQUES", "Piste en herbe 08/26 fermée cause travaux | Prudence :: Grass runway 08/26 closed due to works | Caution")
     partie_fr, partie_en = remarques_raw.split("::") if "::" in remarques_raw else (remarques_raw, "Caution")
