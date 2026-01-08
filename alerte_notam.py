@@ -138,10 +138,13 @@ def construire_message():
         rapport += "\n⚠️ *Prudence lors de votre navigation demain.*\n"
         rapport += "✈️ Vérifiez les NOTAM officiels avant tout vol.\n"
     else:
-        # Pas d'activation prévue pour demain
-        rapport += "✅ *R147 CHARENTE*\n"
-        rapport += "Aucune activation publiée pour demain.\n"
-        rapport += "\n🛩 Navigation libre sur Atlantic Air Park.\n"
+        # Pas d'activation prévue pour demain OU pas d'info fiable
+        rapport += "⚠️ *R147 CHARENTE*\n"
+        rapport += "Statut inconnu ou aucune activation détectée.\n"
+        rapport += "\n📋 *Vérifiez impérativement les NOTAM officiels :*\n"
+        rapport += "• https://notamweb.aviation-civile.gouv.fr\n"
+        rapport += "• https://www.sia.aviation-civile.gouv.fr\n"
+        rapport += "\n⚠️ Ne présumez JAMAIS qu'une zone est inactive sans vérification officielle.\n"
     
     rapport += f"\n🕐 Mise à jour : {maintenant.strftime('%d/%m/%Y %H:%M')}"
     
