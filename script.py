@@ -76,7 +76,7 @@ def scanner_notams(force_refresh=False):
     cache_file = "notam_cache.json"
     if not force_refresh and os.path.exists(cache_file):
         try:
-            cache_age = datetime.now().timestamp() - os.path.getmtime(cache_file)
+            cache_age = datetime.now(timezone.utc).timestamp() - os.path.getmtime(cache_file)
             if cache_age < 3600:
                 with open(cache_file, 'r') as f:
                     cached = json.load(f)
@@ -84,15 +84,21 @@ def scanner_notams(force_refresh=False):
                     return cached
         except Exception as e:
             print(f"DEBUG - Erreur cache: {e}")
+
     print("DEBUG - Scan NOTAM en direct")
     status = {"R147": {"info": "pas d'information", "date": "", "annee": ""}}
+
     try:
+        # 1. Essayer SIA
         url = "https://www.sia.aviation-civile.gouv.fr/schedules"
         headers = {'User-Agent': 'Mozilla/5.0', 'Accept': 'text/html'}
         res = requests.get(url, headers=headers, timeout=15)
         if res.status_code == 200:
             texte = res.text
-            match_r147 = re.search(r'(\d{2})/(\d{2})/(\d{4}).*?R\s*147.*?(\d{1,2})[h:]?(\d{2})[^\d]*(\d{1,2})[h:]?(\d{2})', texte, re.IGNORECASE | re.DOTALL)
+            match_r147 = re.search(
+                r'(\d{2})/(\d{2})/(\d{4}).*?R\s*147.*?(?:(\d{1,2})[h:]?(\d{2})[^\d]*(?:à|to|-)[^\d]*(\d{1,2})[h:]?(\d{2}))',
+                texte, re.IGNORECASE | re.DOTALL
+            )
             if match_r147:
                 jour, mois, annee = match_r147.group(1), match_r147.group(2), match_r147.group(3)
                 h1, m1, h2, m2 = match_r147.group(4), match_r147.group(5), match_r147.group(6), match_r147.group(7)
@@ -100,9 +106,12 @@ def scanner_notams(force_refresh=False):
                 status["R147"]["annee"] = annee
                 status["R147"]["info"] = f"active {h1.zfill(2)}h{m1}-{h2.zfill(2)}h{m2}Z"
                 with open(cache_file, 'w') as f: json.dump(status, f)
+                print(f"DEBUG - NOTAM R147: date={status['R147']['date']}, année={status['R147']['annee']}")
                 return status
     except Exception as e:
         print(f"Err SIA: {e}")
+
+    # 2. Essayer NOTAMWEB
     try:
         url = "https://notamweb.aviation-civile.gouv.fr/Script/IHM/Bul_R.php?ZoneRglmt=RTBA"
         res = requests.get(url, headers={'User-Agent': 'Mozilla/5.0'}, timeout=15)
@@ -112,7 +121,11 @@ def scanner_notams(force_refresh=False):
                 match = re.search(r'R\s*147.*?C(\d{10})/(\d{10})', texte, re.DOTALL | re.IGNORECASE)
                 if match:
                     debut, fin = match.group(1), match.group(2)
-                    status["R147"] = {"date": f"{debut[4:6]}/{debut[2:4]}", "annee": "20"+debut[0:2], "info": f"active {debut[6:8]}:{debut[8:10]}-{fin[6:8]}:{fin[8:10]}Z"}
+                    status["R147"] = {
+                        "date": f"{debut[4:6]}/{debut[2:4]}",
+                        "annee": "20"+debut[0:2],
+                        "info": f"active {debut[6:8]}:{debut[8:10]}-{fin[6:8]}:{fin[8:10]}Z"
+                    }
                 else:
                     match_r147 = re.search(r'R147\s+CHARENTE\s+(\d{2})(\d{2})-(\d{2})(\d{2})', texte, re.IGNORECASE)
                     if match_r147:
@@ -121,14 +134,21 @@ def scanner_notams(force_refresh=False):
                         if matches_date:
                             match_date = matches_date[-1]
                             h1, m1, h2, m2 = match_r147.group(1), match_r147.group(2), match_r147.group(3), match_r147.group(4)
-                            status["R147"] = {"date": f"{match_date.group(1)}/{match_date.group(2)}", "annee": match_date.group(3), "info": f"active {h1}:{m1}-{h2}:{m2}Z"}
+                            status["R147"] = {
+                                "date": f"{match_date.group(1)}/{match_date.group(2)}",
+                                "annee": match_date.group(3),
+                                "info": f"active {h1}:{m1}-{h2}:{m2}Z"
+                            }
                 if status["R147"]["info"] != "pas d'information":
                     with open(cache_file, 'w') as f: json.dump(status, f)
+                    print(f"DEBUG - NOTAM R147: date={status['R147']['date']}, année={status['R147']['annee']}")
                     return status
     except Exception as e:
         print(f"Err NOTAM: {e}")
+
     with open(cache_file, 'w') as f: json.dump(status, f)
     return status
+
 
 async def generer_audio(vocal_fr, vocal_en):
     await edge_tts.Communicate(vocal_fr, "fr-FR-HenriNeural", rate="+5%").save("fr.mp3")
