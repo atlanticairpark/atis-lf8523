@@ -1,4 +1,3 @@
-# .github/workflows/update-notam-hourly.yml
 name: Update NOTAM (1 heure)
 
 on:
