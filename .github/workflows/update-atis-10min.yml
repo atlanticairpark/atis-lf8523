@@ -1,4 +1,3 @@
-# .github/workflows/update-atis-10min.yml
 name: Update ATIS (Météo 10 min)
 
 on:
