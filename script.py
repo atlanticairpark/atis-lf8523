@@ -5,8 +5,8 @@ import asyncio
 import edge_tts
 import time
 import json
+import glob
 from datetime import datetime, timedelta, timezone
-
 
 STATIONS = ["LFBH", "LFRI"]
 
@@ -78,11 +78,20 @@ def scanner_notams(force_refresh=False):
     if not force_refresh and os.path.exists(cache_file):
         try:
             cache_age = datetime.now(timezone.utc).timestamp() - os.path.getmtime(cache_file)
-            if cache_age < 3600:
+            if cache_age < 300:  # 5 minutes max
                 with open(cache_file, 'r') as f:
                     cached = json.load(f)
-                    print(f"DEBUG - Utilisation cache NOTAM (age: {int(cache_age/60)} min)")
-                    return cached
+                    # Vérifier si la date du NOTAM est toujours valide
+                    if cached["R147"]["date"]:
+                        jour, mois = map(int, cached["R147"]["date"].split('/'))
+                        annee = int(cached["R147"]["annee"])
+                        date_notam = datetime(annee, mois, jour, tzinfo=timezone.utc)
+                        if date_notam.date() >= datetime.now(timezone.utc).date():
+                            print(f"DEBUG - Utilisation cache NOTAM (valide, age: {int(cache_age/60)} min)")
+                            return cached
+                        else:
+                            print("DEBUG - Cache obsolète, rafraîchissement forcé")
+                            os.remove(cache_file)
         except Exception as e:
             print(f"DEBUG - Erreur cache: {e}")
 
@@ -96,7 +105,7 @@ def scanner_notams(force_refresh=False):
         res = requests.get(url, headers=headers, timeout=15)
         if res.status_code == 200:
             texte = res.text
-            print(f"DEBUG - Texte brut SIA: {texte[:500]}...")  # Log
+            print(f"DEBUG - Texte brut SIA: {texte[:500]}...")
             match_r147 = re.search(
                 r'(\d{2})/(\d{2})/(\d{4}).*?R\s*147.*?(?:(\d{1,2})[h:]?(\d{2})[^\d]*(?:à|to|-)[^\d]*(\d{1,2})[h:]?(\d{2}))',
                 texte, re.IGNORECASE | re.DOTALL
@@ -107,7 +116,7 @@ def scanner_notams(force_refresh=False):
                 status["R147"]["date"] = f"{jour}/{mois}"
                 status["R147"]["annee"] = annee
                 status["R147"]["info"] = f"active {h1.zfill(2)}h{m1}-{h2.zfill(2)}h{m2}Z"
-                print(f"DEBUG - Match R147: jour={jour}, mois={mois}, année={annee}")  # Log
+                print(f"DEBUG - Match R147: jour={jour}, mois={mois}, année={annee}")
                 with open(cache_file, 'w') as f: json.dump(status, f)
                 return status
             else:
@@ -156,29 +165,34 @@ def scanner_notams(force_refresh=False):
     with open(cache_file, 'w') as f: json.dump(status, f)
     return status
 
-
-
 async def generer_audio(vocal_fr, vocal_en):
     await edge_tts.Communicate(vocal_fr, "fr-FR-HenriNeural", rate="+5%").save("fr.mp3")
     await edge_tts.Communicate(vocal_en, "en-GB-ThomasNeural", rate="+10%").save("en.mp3")
-    with open("atis.mp3", "wb") as f:
+    ts = int(time.time())
+    with open(f"atis_{ts}.mp3", "wb") as f:
         for fname in ["fr.mp3", "en.mp3"]:
-            with open(fname, "rb") as fd: f.write(fd.read())
+            with open(fname, "rb") as fd:
+                f.write(fd.read())
+    for old_file in glob.glob("atis_*.mp3"):
+        if old_file != f"atis_{ts}.mp3":
+            os.remove(old_file)
+    os.rename(f"atis_{ts}.mp3", "atis.mp3")  # Remplace l'ancien fichier
     for f in ["fr.mp3", "en.mp3"]:
-        if os.path.exists(f): os.remove(f)
+        if os.path.exists(f):
+            os.remove(f)
 
 async def executer_veille():
     m = obtenir_donnees_moyennes()
     force_refresh = os.getenv("FORCE_NOTAM_REFRESH", "0") == "1"
     notams = scanner_notams(force_refresh=force_refresh)
     if not m: return
-    maintenant = datetime.now()
+    maintenant = datetime.now(timezone.utc)
     date_generation_courte = maintenant.strftime("%d/%m %H:%M")
     notam_r147_actif = False
     if notams['R147']['date'] and notams['R147']['annee']:
         try:
             jour, mois = notams['R147']['date'].split("/")
-            date_notam = datetime(int(notams['R147']['annee']), int(mois), int(jour))
+            date_notam = datetime(int(notams['R147']['annee']), int(mois), int(jour), tzinfo=timezone.utc)
             match_heure_fin = re.search(r'-(\d{2})h(\d{2})Z', notams['R147']['info'])
             if match_heure_fin:
                 heure_fin = int(match_heure_fin.group(1))
@@ -216,8 +230,67 @@ async def executer_veille():
     await generer_audio(txt_fr, txt_en)
     ts = int(time.time())
     prochaine = (maintenant.replace(minute=0,second=0) + timedelta(hours=1)).strftime('%H:%M')
-    html = f"""<!DOCTYPE html><html lang="fr"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"><title>ATIS LF8523</title><style>*{{box-sizing:border-box}}body{{font-family:-apple-system,sans-serif;padding:2.5vh 2.5vw;background:linear-gradient(135deg,#2c5f7c,#4a90b8,#6bb6d6);color:#e0e0e0;min-height:100vh;margin:0}}.container{{width:95%;margin:0 auto}}h1{{color:#fff;margin:0 0 8px 0;font-size:2em;font-weight:700;text-align:center}}.subtitle{{color:#fff;font-weight:600;margin-bottom:30px;text-transform:uppercase;letter-spacing:2px;font-size:.85em;text-align:center;opacity:.9}}.data-grid{{display:grid;grid-template-columns:1fr 1fr;gap:15px;margin-bottom:25px}}.data-item{{background:rgba(20,60,90,.6);padding:18px;border-radius:12px;border:1px solid rgba(100,180,220,.3);transition:all .3s;backdrop-filter:blur(5px)}}.data-item:hover{{background:rgba(20,60,90,.75);transform:translateY(-2px)}}.label{{font-size:.7em;color:rgba(255,255,255,.7);text-transform:uppercase;font-weight:600}}.value{{font-size:1.3em;font-weight:700;color:#fff;margin-top:8px}}.alert-section{{text-align:left;background:rgba(20,60,90,.5);border-left:4px solid #ff9800;padding:18px;margin-bottom:25px;border-radius:8px}}.alert-line{{color:#ffb74d;font-weight:600;font-size:.9em;margin-bottom:10px}}.zone-date{{display:inline-block;background:rgba(255,183,77,.25);padding:3px 10px;border-radius:6px;margin-left:8px;color:#ffd54f;font-weight:700;border:1px solid rgba(255,183,77,.4)}}.audio-container{{background:rgba(20,60,90,.6);padding:15px;border-radius:12px;margin:20px 0;border:2px solid rgba(100,180,220,.4)}}.audio-label{{font-size:.85em;color:#fff;font-weight:700;text-transform:uppercase;margin-bottom:10px;display:block}}audio{{width:100%;filter:invert(90%) hue-rotate(180deg);border-radius:8px;height:40px}}.btn-refresh{{background:rgba(20,60,90,.7);color:#fff;border:2px solid rgba(100,180,220,.5);padding:14px 24px;border-radius:10px;cursor:pointer;margin-top:20px;font-size:.95em;font-weight:700;width:100%;text-transform:uppercase}}.btn-refresh:hover{{background:rgba(20,60,90,.85);transform:translateY(-2px)}}.update-info{{font-size:.9em;color:#fff;margin-top:12px;font-weight:600;background:rgba(20,60,90,.5);padding:8px 12px;border-radius:8px;text-align:center}}.disclaimer{{font-size:.7em;color:rgba(255,255,255,.8);margin-top:30px;line-height:1.6;text-align:left;background:rgba(20,60,90,.4);padding:15px;border-radius:8px;border-left:3px solid #ff9800}}.disclaimer strong{{color:#fff;font-weight:700}}</style></head><body><div class="container"><h1>ATIS LF8523</h1><div class="subtitle">Atlantic Air Park</div><div class="data-grid"><div class="data-item"><div class="label">Heure (UTC)</div><div class="value">⌚ {m['heure_metar']}Z</div></div><div class="data-item"><div class="label">Vent</div><div class="value">🌬 {m['w_dir_visu']}kt</div></div><div class="data-item"><div class="label">Temp / Rosée</div><div class="value">🌡 {m['temp_visu']}° / {m['dew_visu']}°</div></div><div class="data-item"><div class="label">QNH</div><div class="value">💎 {m['qnh']} hPa</div></div></div><div class="alert-section">{html_remarques}{('<div class="alert-line">🚨 R147 CHARENTE : '+notams["R147"]["info"]+('<span class="zone-date">📅 '+notams["R147"]["date"]+'</span>' if notams["R147"]["date"] else '')+'</div>') if notam_r147_actif else ''}</div><div class="audio-container"><span class="audio-label">🔊 Écouter l'ATIS</span><audio controls><source src="atis.mp3?v={ts}" type="audio/mpeg"></audio></div><button class="btn-refresh" onclick="window.location.reload()">🔄 Actualiser la page</button><div class="update-info">🕐 Données: {date_generation_courte}</div><div style="font-size:.75em;color:rgba(255,255,255,.6);margin-top:8px;text-align:center">ℹ️ Prochaine mise à jour: {prochaine}Z</div><div class="disclaimer"><strong>⚠️ Avertissement:</strong> Les informations affichées sont indicatives et calculées à partir de sources publiques (moyennes LFBH/LFRI). <strong>Atlantic Air Park ne garantit pas l'exactitude de ces données.</strong> Seules les informations officielles publiées par les autorités aéronautiques compétentes (SIA, Météo France, etc.) font foi. Il est impératif de consulter les sources officielles avant tout vol.</div></div></body></html>"""
-    with open("index.html", "w", encoding="utf-8") as f: f.write(html)
+    html = f"""<!DOCTYPE html>
+    <html lang="fr">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+        <meta http-equiv="Pragma" content="no-cache">
+        <meta http-equiv="Expires" content="0">
+        <title>ATIS LF8523</title>
+        <style>
+            *{{box-sizing:border-box}}body{{font-family:-apple-system,sans-serif;padding:2.5vh 2.5vw;background:linear-gradient(135deg,#2c5f7c,#4a90b8,#6bb6d6);color:#e0e0e0;min-height:100vh;margin:0}}.container{{width:95%;margin:0 auto}}h1{{color:#fff;margin:0 0 8px 0;font-size:2em;font-weight:700;text-align:center}}.subtitle{{color:#fff;font-weight:600;margin-bottom:30px;text-transform:uppercase;letter-spacing:2px;font-size:.85em;text-align:center;opacity:.9}}.data-grid{{display:grid;grid-template-columns:1fr 1fr;gap:15px;margin-bottom:25px}}.data-item{{background:rgba(20,60,90,.6);padding:18px;border-radius:12px;border:1px solid rgba(100,180,220,.3);transition:all .3s;backdrop-filter:blur(5px)}}.data-item:hover{{background:rgba(20,60,90,.75);transform:translateY(-2px)}}.label{{font-size:.7em;color:rgba(255,255,255,.7);text-transform:uppercase;font-weight:600}}.value{{font-size:1.3em;font-weight:700;color:#fff;margin-top:8px}}.alert-section{{text-align:left;background:rgba(20,60,90,.5);border-left:4px solid #ff9800;padding:18px;margin-bottom:25px;border-radius:8px}}.alert-line{{color:#ffb74d;font-weight:600;font-size:.9em;margin-bottom:10px}}.zone-date{{display:inline-block;background:rgba(255,183,77,.25);padding:3px 10px;border-radius:6px;margin-left:8px;color:#ffd54f;font-weight:700;border:1px solid rgba(255,183,77,.4)}}.audio-container{{background:rgba(20,60,90,.6);padding:15px;border-radius:12px;margin:20px 0;border:2px solid rgba(100,180,220,.4)}}.audio-label{{font-size:.85em;color:#fff;font-weight:700;text-transform:uppercase;margin-bottom:10px;display:block}}audio{{width:100%;filter:invert(90%) hue-rotate(180deg);border-radius:8px;height:40px}}.btn-refresh{{background:rgba(20,60,90,.7);color:#fff;border:2px solid rgba(100,180,220,.5);padding:14px 24px;border-radius:10px;cursor:pointer;margin-top:20px;font-size:.95em;font-weight:700;width:100%;text-transform:uppercase}}.btn-refresh:hover{{background:rgba(20,60,90,.85);transform:translateY(-2px)}}.update-info{{font-size:.9em;color:#fff;margin-top:12px;font-weight:600;background:rgba(20,60,90,.5);padding:8px 12px;border-radius:8px;text-align:center}}.disclaimer{{font-size:.7em;color:rgba(255,255,255,.8);margin-top:30px;line-height:1.6;text-align:left;background:rgba(20,60,90,.4);padding:15px;border-radius:8px;border-left:3px solid #ff9800}}.disclaimer strong{{color:#fff;font-weight:700}}
+        </style>
+    </head>
+    <body>
+        <div class="container">
+            <h1>ATIS LF8523</h1>
+            <div class="subtitle">Atlantic Air Park</div>
+            <div class="data-grid">
+                <div class="data-item">
+                    <div class="label">Heure (UTC)</div>
+                    <div class="value">⌚ {m['heure_metar']}Z</div>
+                </div>
+                <div class="data-item">
+                    <div class="label">Vent</div>
+                    <div class="value">🌬 {m['w_dir_visu']}kt</div>
+                </div>
+                <div class="data-item">
+                    <div class="label">Temp / Rosée</div>
+                    <div class="value">🌡 {m['temp_visu']}° / {m['dew_visu']}°</div>
+                </div>
+                <div class="data-item">
+                    <div class="label">QNH</div>
+                    <div class="value">💎 {m['qnh']} hPa</div>
+                </div>
+            </div>
+            <div class="alert-section">
+                {html_remarques}
+                {('<div class="alert-line">🚨 R147 CHARENTE : '+notams["R147"]["info"]+('<span class="zone-date">📅 '+notams["R147"]["date"]+'</span>' if notams["R147"]["date"] else '')+'</div>') if notam_r147_actif else ''}
+            </div>
+            <div class="audio-container">
+                <span class="audio-label">🔊 Écouter l'ATIS</span>
+                <audio controls>
+                    <source src="atis.mp3?v={ts}" type="audio/mpeg">
+                </audio>
+            </div>
+            <button id="force-refresh" class="btn-refresh">🔄 Actualiser les données</button>
+            <div class="update-info">🕐 Données: {date_generation_courte}</div>
+            <div style="font-size:.75em;color:rgba(255,255,255,.6);margin-top:8px;text-align:center">ℹ️ Prochaine mise à jour: {prochaine}Z</div>
+            <div class="disclaimer">
+                <strong>⚠️ Avertissement:</strong> Les informations affichées sont indicatives et calculées à partir de sources publiques (moyennes LFBH/LFRI). <strong>Atlantic Air Park ne garantit pas l'exactitude de ces données.</strong> Seules les informations officielles publiées par les autorités aéronautiques compétentes (SIA, Météo France, etc.) font foi. Il est impératif de consulter les sources officielles avant tout vol.
+            </div>
+        </div>
+        <script>
+            document.getElementById('force-refresh').addEventListener('click', function() {{
+                window.location.href = window.location.href.split('?')[0] + '?t=' + new Date().getTime();
+            }});
+        </script>
+    </body>
+    </html>"""
+    with open("index.html", "w", encoding="utf-8") as f:
+        f.write(html)
 
 if __name__ == "__main__":
     asyncio.run(executer_veille())
