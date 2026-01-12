@@ -33,8 +33,10 @@ jobs:
         run: |
           git config --local user.email "github-actions[bot]@users.noreply.github.com"
           git config --local user.name "github-actions[bot]"
-          git add index.html atis.mp3 notam_cache.json 2>/dev/null || true
-          git diff --quiet && git diff --staged --quiet || git commit -m "🔄 ATIS update"
-          git pull --rebase origin main || true
-          git push || (git pull --rebase origin main && git push)
-      
+          # On ajoute tout le contenu modifié
+          git add .
+          # On commit seulement s'il y a des changements
+          git diff --quiet && git diff --staged --quiet || git commit -m "🔄 ATIS update auto"
+          # Sécurité : on récupère les éventuelles modifs distantes avant de pousser
+          git pull --rebase origin main
+          git push origin main
