@@ -96,6 +96,7 @@ def scanner_notams(force_refresh=False):
         res = requests.get(url, headers=headers, timeout=15)
         if res.status_code == 200:
             texte = res.text
+            print(f"DEBUG - Texte brut SIA: {texte[:500]}...")  # Log
             match_r147 = re.search(
                 r'(\d{2})/(\d{2})/(\d{4}).*?R\s*147.*?(?:(\d{1,2})[h:]?(\d{2})[^\d]*(?:à|to|-)[^\d]*(\d{1,2})[h:]?(\d{2}))',
                 texte, re.IGNORECASE | re.DOTALL
@@ -106,9 +107,11 @@ def scanner_notams(force_refresh=False):
                 status["R147"]["date"] = f"{jour}/{mois}"
                 status["R147"]["annee"] = annee
                 status["R147"]["info"] = f"active {h1.zfill(2)}h{m1}-{h2.zfill(2)}h{m2}Z"
+                print(f"DEBUG - Match R147: jour={jour}, mois={mois}, année={annee}")  # Log
                 with open(cache_file, 'w') as f: json.dump(status, f)
-                print(f"DEBUG - NOTAM R147: date={status['R147']['date']}, année={status['R147']['annee']}")
                 return status
+            else:
+                print("DEBUG - Aucun match R147 sur SIA")
     except Exception as e:
         print(f"Err SIA: {e}")
 
@@ -127,6 +130,7 @@ def scanner_notams(force_refresh=False):
                         "annee": "20"+debut[0:2],
                         "info": f"active {debut[6:8]}:{debut[8:10]}-{fin[6:8]}:{fin[8:10]}Z"
                     }
+                    print(f"DEBUG - Match NOTAMWEB: date={status['R147']['date']}, année={status['R147']['annee']}")
                 else:
                     match_r147 = re.search(r'R147\s+CHARENTE\s+(\d{2})(\d{2})-(\d{2})(\d{2})', texte, re.IGNORECASE)
                     if match_r147:
@@ -140,15 +144,18 @@ def scanner_notams(force_refresh=False):
                                 "annee": match_date.group(3),
                                 "info": f"active {h1}:{m1}-{h2}:{m2}Z"
                             }
+                            print(f"DEBUG - Match NOTAMWEB (fallback): date={status['R147']['date']}, année={status['R147']['annee']}")
                 if status["R147"]["info"] != "pas d'information":
                     with open(cache_file, 'w') as f: json.dump(status, f)
-                    print(f"DEBUG - NOTAM R147: date={status['R147']['date']}, année={status['R147']['annee']}")
                     return status
+            else:
+                print("DEBUG - R147 non trouvé sur NOTAMWEB")
     except Exception as e:
-        print(f"Err NOTAM: {e}")
+        print(f"Err NOTAMWEB: {e}")
 
     with open(cache_file, 'w') as f: json.dump(status, f)
     return status
+
 
 
 async def generer_audio(vocal_fr, vocal_en):
