@@ -1,5 +1,10 @@
 name: Update NOTAM (1 heure)
 
+# Gestion de la file d'attente pour éviter les collisions entre workflows
+concurrency:
+  group: git-sync
+  cancel-in-progress: false
+
 on:
   schedule:
     - cron: '5 * * * *'
@@ -33,7 +38,18 @@ jobs:
         run: |
           git config --local user.email "github-actions[bot]@users.noreply.github.com"
           git config --local user.name "github-actions[bot]"
+          
+          # Ajout des fichiers modifiés
           git add index.html atis.mp3 notam_cache.json 2>/dev/null || true
-          git diff --quiet && git diff --staged --quiet || git commit -m "🔄 ATIS update"
-          git pull --rebase origin main || true
-          git push || (git pull --rebase origin main && git push)
+          
+          # Vérification s'il y a des changements avant de commiter
+          if ! git diff --quiet --staged; then
+            git commit -m "🔄 ATIS update (NOTAM check)"
+            
+            # Boucle de sécurité pour le push avec rebase en cas de conflit de dernière seconde
+            for i in {1..5}; do
+              git pull --rebase origin main && git push && break || sleep 5
+            done
+          else
+            echo "Aucun changement détecté, rien à pousser."
+          fi
