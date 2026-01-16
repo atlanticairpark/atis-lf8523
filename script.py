@@ -97,6 +97,7 @@ def scanner_notams(force_refresh=False):
         headers = {'User-Agent': 'Mozilla/5.0'}
         res = requests.get(url, headers=headers, timeout=15)
         if res.status_code == 200:
+            # Capture de la date spécifiquement liée à la ligne R 147
             match_r147 = re.search(
                 r'(\d{2})/(\d{2})/(\d{4}).*?R\s*147.*?(?:(\d{1,2})[h:]?(\d{2})[^\d]*(?:à|to|-)[^\d]*(\d{1,2})[h:]?(\d{2}))',
                 res.text, re.IGNORECASE | re.DOTALL
@@ -133,7 +134,6 @@ async def executer_veille():
     maintenant = datetime.now(timezone.utc)
     date_generation_courte = maintenant.strftime("%d/%m %H:%M")
     
-    # --- SECTION CORRIGÉE POUR LE CAS 00h00Z ---
     notam_r147_actif = False
     if notams['R147']['date'] and notams['R147']['annee']:
         try:
@@ -145,7 +145,6 @@ async def executer_veille():
                 h_fin = int(match_heure_fin.group(1))
                 m_fin = int(match_heure_fin.group(2))
                 
-                # Correction spécifique pour la fin à minuit
                 if h_fin == 0 and m_fin == 0:
                     date_notam_fin = date_notam.replace(hour=23, minute=59, second=59)
                 else:
@@ -159,7 +158,6 @@ async def executer_veille():
                 notam_r147_actif = True
         except: notam_r147_actif = "active" in notams['R147']['info'].lower()
     else: notam_r147_actif = "active" in notams['R147']['info'].lower()
-    # --- FIN DE LA SECTION CORRIGÉE ---
 
     remarques_raw = os.getenv("ATIS_REMARQUES", "Piste en herbe 08/26 fermée :: Grass runway 08/26 closed")
     partie_fr, partie_en = remarques_raw.split("::") if "::" in remarques_raw else (remarques_raw, "Caution")
