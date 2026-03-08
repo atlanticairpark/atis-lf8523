@@ -1,15 +1,11 @@
 name: Update NOTAM (1 heure)
-
-# Gestion de la file d'attente pour éviter les collisions entre workflows
 concurrency:
   group: git-sync
   cancel-in-progress: false
-
 on:
   schedule:
     - cron: '5 * * * *'
   workflow_dispatch:
-
 jobs:
   update:
     runs-on: ubuntu-latest
@@ -26,27 +22,24 @@ jobs:
           python-version: '3.9'
       
       - name: Install dependencies
-        run: pip install requests edge-tts
+        run: pip install requests edge-tts beautifulsoup4
       
       - name: Force NOTAM refresh
         env:
           ATIS_REMARQUES: ${{ secrets.ATIS_REMARQUES }}
           FORCE_NOTAM_REFRESH: "1"
         run: python script.py
-      
+
       - name: Commit and Push
         run: |
           git config --local user.email "github-actions[bot]@users.noreply.github.com"
           git config --local user.name "github-actions[bot]"
           
-          # Ajout des fichiers modifiés
           git add index.html atis.mp3 notam_cache.json 2>/dev/null || true
           
-          # Vérification s'il y a des changements avant de commiter
           if ! git diff --quiet --staged; then
             git commit -m "🔄 ATIS update (NOTAM check)"
             
-            # Boucle de sécurité pour le push avec rebase en cas de conflit de dernière seconde
             for i in {1..5}; do
               git pull --rebase origin main && git push && break || sleep 5
             done
