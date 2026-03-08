@@ -93,23 +93,30 @@ def scanner_notams(force_refresh=False):
 
     status = {"R147": {"info": "pas d'information", "date": "", "annee": ""}}
     try:
+        from bs4 import BeautifulSoup
         url = "https://www.sia.aviation-civile.gouv.fr/schedules"
         headers = {'User-Agent': 'Mozilla/5.0'}
         res = requests.get(url, headers=headers, timeout=15)
         if res.status_code == 200:
-            # Capture de la date d'activité APRÈS la référence R 147 (pas la date de publication)
-            match_r147 = re.search(
-                r'R\s*147.*?(\d{2})/(\d{2})/(\d{4}).*?(?:(\d{1,2})[h:]?(\d{2})[^\d]*(?:à|to|-)[^\d]*(\d{1,2})[h:]?(\d{2}))',
-                res.text, re.IGNORECASE | re.DOTALL
-            )
-            if match_r147:
-                status["R147"] = {
-                    "date": f"{match_r147.group(1)}/{match_r147.group(2)}",
-                    "annee": match_r147.group(3),
-                    "info": f"active {match_r147.group(4).zfill(2)}h{match_r147.group(5)}-{match_r147.group(6).zfill(2)}h{match_r147.group(7)}Z"
-                }
-                with open(cache_file, 'w') as f: json.dump(status, f)
-                return status
+            soup = BeautifulSoup(res.text, 'html.parser')
+            # Structure : <div>DD/MM/YYYY</div><div class="zone-id">R147</div><div>HHMM-HHMM</div>
+            for zone_div in soup.find_all('div', class_='zone-id'):
+                if zone_div.get_text(strip=True) == 'R147':
+                    parent = zone_div.parent
+                    divs = parent.find_all('div', recursive=False)
+                    if len(divs) >= 3:
+                        date_str = divs[0].get_text(strip=True)
+                        heures_str = divs[2].get_text(strip=True)
+                        m_date = re.match(r'(\d{2})/(\d{2})/(\d{4})', date_str)
+                        m_heure = re.match(r'(\d{2})(\d{2})-(\d{2})(\d{2})', heures_str)
+                        if m_date and m_heure:
+                            status["R147"] = {
+                                "date": f"{m_date.group(1)}/{m_date.group(2)}",
+                                "annee": m_date.group(3),
+                                "info": f"active {m_heure.group(1)}h{m_heure.group(2)}-{m_heure.group(3)}h{m_heure.group(4)}Z"
+                            }
+                            with open(cache_file, 'w') as f: json.dump(status, f)
+                            return status
     except: pass
     return status
 
