@@ -46,8 +46,10 @@ def obtenir_donnees_moyennes():
     m_t = round(sum(temps)/len(temps)) if temps else 0
     m_r = round(sum(rosees)/len(rosees)) if rosees else 0
     m_q = round(sum(qnhs)/len(qnhs))
-    m_wd = round(sum(vents_dir)/len(vents_dir)) if vents_dir else None
     m_ws = round(sum(vents_spd)/len(vents_spd))
+    m_wd = round(round(sum(vents_dir)/len(vents_dir) / 10) * 10) if vents_dir else None
+    if m_wd is not None and m_wd == 0 and m_ws > 0:
+        m_wd = 360
     max_g = max(rafales) if rafales else None
     q_str = str(m_q)
     q_audio_fr = " ".join([formater_chiffre_fr(c) for c in list(q_str)])
