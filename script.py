@@ -226,6 +226,7 @@ async def executer_veille():
                 <audio controls><source src="atis.mp3?v={ts}" type="audio/mpeg"></audio>
             </div>
             <button id="force-refresh" class="btn-refresh">🔄 Actualiser les données</button>
+            <a href="https://notam.aildor.fr" target="_blank" style="display:block;text-align:center;margin-top:12px;background:rgba(20,60,90,.7);color:#fff;border:2px solid rgba(100,180,220,.5);padding:14px 24px;border-radius:10px;font-size:.95em;font-weight:700;text-transform:uppercase;text-decoration:none;transition:all .3s">📋 NOTAMs en vigueur — LF8523</a>
             <div class="update-info">🕐 Données: {date_generation_courte}</div>
             <div style="font-size:.75em;color:rgba(255,255,255,.6);margin-top:8px;text-align:center">ℹ️ Prochaine mise à jour: {prochaine}Z</div>
             <div class="disclaimer"><strong>⚠️ Avertissement:</strong> Informations indicatives. Seules les sources officielles (SIA, Météo France) font foi.</div>
